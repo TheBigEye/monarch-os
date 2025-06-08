@@ -13,7 +13,6 @@ void main(void) {
     */
 
     while (true) {
-
         printf("\n");
 
         if (BFS_CURRENT_DIR != BFS_PRIMARY_DIR) {
@@ -27,41 +26,50 @@ void main(void) {
         // Trim whitespaces for avoid errors
         strtrim(input);
 
+        if (!strlen(input)) {
+            continue;
+        }
+
+
         if (strcmp(input, "HALT") == 0) {
             printl(INFO, "The CPU has HALTED NOW!");
             powerControl(POWER_HALT);
+        }
 
-        } else if (strcmp(input, "SHUTDOWN") == 0) {
+        else if (strcmp(input, "SHUTDOWN") == 0) {
             printl(INFO, "Shutting down the system ...");
             shutdownSound();
 
-            setScreen(NULL);
-            setCursor(0x3F);
+            tty_clear(NULL);
+            tty_cursor(0x3F, -1, -1);
 
             initializeVGA(video_mode);
-            fillScreen(PX_BLACK);
-            drawBitmapFast(candle_640, 0, 0, 640, 480);
+            gfx_clear(PX_BLACK);
+            gfx_draw(candle_640, 0, 0, 640, 480);
 
             powerControl(POWER_SHUTDOWN);
 
             /* Just in case */
             FOREVER NOTHING
+        }
 
-        } else if (strcmp(input, "REBOOT") == 0) {
+        else if (strcmp(input, "REBOOT") == 0) {
             printl(INFO, "Rebooting the system ...");
             shutdownSound();
             powerControl(POWER_REBOOT);
+        }
 
-        } else if (strcmp(input, "CLS") == 0 || strcmp(input, "CLEAR") == 0) {
-            setScreen(NULL);
+        else if (strcmp(input, "CLS") == 0 || strcmp(input, "CLEAR") == 0) {
+            tty_clear(NULL);
+        }
 
-        } else if (strcmp(input, "CLOCK") == 0) {
+        else if (strcmp(input, "CLOCK") == 0) {
             getDateTime();
             printf("\n");
             getCalendar();
+        }
 
-
-        } else if (strcmp(input, "BUG") == 0) {
+        else if (strcmp(input, "BUG") == 0) {
             triggerPanic("Controlled Kernel Panic", 0, 0xDEADDEAD, NULL);
 
         } else if (substrcmp("CALC", input) == 0) {
@@ -89,15 +97,15 @@ void main(void) {
             printl(INFO, "GCC version %s\n", __VERSION__);
             printf(" * Compiled at %s\n\n", __TIMESTAMP__);
 
-            ttyPrintLog(INFO "This project is dedicated to:\n");
+            tty_printl(INFO "This project is dedicated to:\n");
             printf(
                 " * My teachers [\n\r\t%s,\n\r\t%s,\n\r\t%s,\n\r\t%s\n\r   ]\n",
                 "Hugo Luna", "Pablo Zelaya", "Sergio Scoleri", "Daniel Palacios"
             );
-            ttyPrintLog("\033[96;40m * And my school friends :D \033[0m \n\r");
+            tty_printl("\033[96;40m * And my school friends :D \033[0m \n\r");
 
         } else if (strcmp("CHARS", input) == 0) {
-            ttyCharset();
+            tty_probe();
 
         } else if (strcmp("HEAP", input) == 0) {
             memoryGetStatus();
@@ -110,133 +118,138 @@ void main(void) {
             timerSleep(150);
             initializeVGA(video_mode);
 
-            fillScreen(PX_BLACK); timerSleep(20);
-            fillScreen(PX_GREEN); timerSleep(20);
-            fillScreen(PX_CYAN); timerSleep(20);
-            fillScreen(PX_RED); timerSleep(20);
-            fillScreen(PX_MAGENTA); timerSleep(20);
-            fillScreen(PX_BROWN); timerSleep(20);
-            fillScreen(PX_BLUE); timerSleep(20);
+            gfx_clear(PX_BLACK); timerSleep(20);
+            gfx_clear(PX_GREEN); timerSleep(20);
+            gfx_clear(PX_CYAN); timerSleep(20);
+            gfx_clear(PX_RED); timerSleep(20);
+            gfx_clear(PX_MAGENTA); timerSleep(20);
+            gfx_clear(PX_BROWN); timerSleep(20);
+            gfx_clear(PX_BLUE); timerSleep(20);
 
-            drawCharset();
-            drawString("- Two of the most famous products of Berkeley are LSD and Unix.\n\rI don't think that this is a coincidence ...", 8, 72, 0x10 | 0x0F);
-            drawString("- Installing software on Windows is like opening a surprise box:\n\rYou never know what else comes bundled with the program you're installing", 8, 96, 0x10 | 0x0F);
-            drawString("- MacOS users: convinced that paying a premium price for a computer\n\rmeans never having to admit that right-clicking might actually be useful", 8, 120, 0x10 | 0x0F);
+            gfx_probe();
+            gfx_plots("- Two of the most famous products of Berkeley are LSD and Unix.\n\rI don't think that this is a coincidence ...", 8, 72, 0x10 | 0x0F);
+            gfx_plots("- Installing software on Windows is like opening a surprise box:\n\rYou never know what else comes bundled with the program you're installing", 8, 96, 0x10 | 0x0F);
+            gfx_plots("- MacOS users: convinced that paying a premium price for a computer\n\rmeans never having to admit that right-clicking might actually be useful", 8, 120, 0x10 | 0x0F);
 
-            drawSolidRect(PX_LTGREEN, 16, 152, 128, 32); // rectangle
-            drawLine(PX_LTGREEN, 16, 216, 144, 216); // horizontal line
-            drawLine(PX_LTGREEN, 16, 248, 144, 280); // diagonal line
+            gfx_plotr(PX_LTGREEN, 16, 152, 128, 32, true); // rectangle
+            gfx_plotl(PX_LTGREEN, 16, 216, 144, 216); // horizontal line
+            gfx_plotl(PX_LTGREEN, 16, 248, 144, 280); // diagonal line
 
-            drawEmptyCircle(PX_LTRED, 80, 328, 32);
-            drawSolidCircle(PX_LTRED, 80, 408, 32);
+            gfx_ploto(PX_LTRED, 80, 328, 32, false);
+            gfx_ploto(PX_LTRED, 80, 408, 32, true);
 
             // vertical line
-            drawLine(PX_LTMAGENTA, 176, 152, 176, 440);
+            gfx_plotl(PX_LTMAGENTA, 176, 152, 176, 440);
 
 
         } else if (strcmp(input, "NOISE") == 0) {
             printl(INFO, "Switching to video mode...");
             timerSleep(200);
             initializeVGA(video_mode);
-            fillScreen(PX_WHITE);
+            gfx_clear(PX_WHITE);
 
             uint32_t counter = 0;
             while ((counter++) < 42949600) {
-                uint16_t x = (randomGet() & 0x7FFFFFFF) % GRAPHMODE_WIDTH;
-                uint16_t y = (randomGet() & 0x7FFFFFFF) % GRAPHMODE_HEIGHT;
+                uint16_t x = (rng_next() & 0x7FFFFFFF) % GRAPHMODE_WIDTH;
+                uint16_t y = (rng_next() & 0x7FFFFFFF) % GRAPHMODE_HEIGHT;
 
-                uint8_t c = (randomGet() & 0x7FFFFFFF) % 15;
-                plotPixel(c, x, y);
-                plotPixel(c, x + 1, y + 1);
-                plotPixel(c, x + 1, y);
-                plotPixel(c, x, y + 1);
+                uint8_t c = (rng_next() & 0x7FFFFFFF) % 15;
+                gfx_plotp(c, x, y);
+                gfx_plotp(c, x + 1, y + 1);
+                gfx_plotp(c, x + 1, y);
+                gfx_plotp(c, x, y + 1);
             }
 
 
         } else if (strcmp(input, "GRAPHICS") == 0) {
             printl(INFO, "Starting graphics demo...");
-            timerSleep(200);
+            timerSleep(100);
             initializeVGA(video_mode);
-            fillScreen(PX_BLACK);
+            gfx_clear(PX_BLACK);
 
             bglPlayDemo();
 
             timerSleep(100);
-            fillScreen(PX_BLACK);
+            gfx_clear(PX_BLACK);
 
             bglPlayDemoEx();
 
             timerSleep(100);
+            gfx_clear(PX_BLACK);
+
+            bglPlayTextDemo();
+
+            timerSleep(100);
             initializeVGA(text_mode);
-            setScreen(NULL);
+            tty_clear(NULL);
 
 
         } else if (strcmp(input, "WALLPAPER") == 0) {
             printl(INFO, "Switching to video mode...");
             timerSleep(200);
             initializeVGA(video_mode);
-            fillScreen(PX_BLACK);
+            gfx_clear(PX_BLACK);
             timerSleep(200);
 
-            fillScreen(PX_BLACK);
-            drawBitmapFast(bigeye_480, 80, 0, 480, 480);
+            gfx_clear(PX_BLACK);
+            gfx_draw(bigeye_480, 80, 0, 480, 480);
             timerSleep(1024);
 
-            fillScreen(PX_BLACK);
-            drawBitmapFast(myfall_480, 80, 0, 480, 480);
+            gfx_clear(PX_BLACK);
+            gfx_draw(myfall_480, 80, 0, 480, 480);
             timerSleep(1024);
 
-            fillScreen(PX_BLACK);
-            drawBitmapFast(myfood_480, 80, 0, 480, 480);
+            gfx_clear(PX_BLACK);
+            gfx_draw(myfood_480, 80, 0, 480, 480);
             timerSleep(1024);
 
-            fillScreen(PX_BLACK);
-            drawBitmapFast(mylamb_480, 80, 0, 480, 480);
+            gfx_clear(PX_BLACK);
+            gfx_draw(mylamb_480, 80, 0, 480, 480);
             timerSleep(1024);
 
-            fillScreen(PX_BLACK);
-            drawBitmapFast(mylife_480, 80, 0, 480, 480);
+            gfx_clear(PX_BLACK);
+            gfx_draw(mylife_480, 80, 0, 480, 480);
             timerSleep(1024);
 
-            fillScreen(PX_BLACK);
-            drawBitmapFast(mymind_480, 80, 0, 480, 480);
+            gfx_clear(PX_BLACK);
+            gfx_draw(mymind_480, 80, 0, 480, 480);
             timerSleep(1024);
 
-            fillScreen(PX_BLACK);
-            drawBitmapFast(theman_480, 80, 0, 480, 480);
+            gfx_clear(PX_BLACK);
+            gfx_draw(theman_480, 80, 0, 480, 480);
             timerSleep(1024);
 
 
-            fillScreen(PX_BLACK);
-            drawBitmapFast(candle_640, 0, 0, 640, 480);
+            gfx_clear(PX_BLACK);
+            gfx_draw(candle_640, 0, 0, 640, 480);
             timerSleep(1024);
 
-            fillScreen(PX_BLACK);
-            drawBitmapFast(choice_640, 0, 0, 640, 480);
+            gfx_clear(PX_BLACK);
+            gfx_draw(choice_640, 0, 0, 640, 480);
             timerSleep(1024);
 
-            fillScreen(PX_BLACK);
-            drawBitmapFast(clouds_640, 0, 0, 640, 480);
+            gfx_clear(PX_BLACK);
+            gfx_draw(clouds_640, 0, 0, 640, 480);
             timerSleep(1024);
 
-            fillScreen(PX_BLACK);
-            drawBitmapFast(myhill_640, 0, 0, 640, 480);
+            gfx_clear(PX_BLACK);
+            gfx_draw(myhill_640, 0, 0, 640, 480);
             timerSleep(1024);
 
-            fillScreen(PX_BLACK);
-            drawBitmapFast(mypain_640, 0, 0, 640, 480);
+            gfx_clear(PX_BLACK);
+            gfx_draw(mypain_640, 0, 0, 640, 480);
             timerSleep(1024);
 
-            fillScreen(PX_BLACK);
-            drawBitmapFast(mypath_640, 0, 0, 640, 480);
+            gfx_clear(PX_BLACK);
+            gfx_draw(mypath_640, 0, 0, 640, 480);
             timerSleep(1024);
 
-            fillScreen(PX_BLACK);
-            drawBitmapFast(myroad_640, 0, 0, 640, 480);
+            gfx_clear(PX_BLACK);
+            gfx_draw(myroad_640, 0, 0, 640, 480);
             timerSleep(1024);
 
             initializeVGA(text_mode);
-            setScreen(NULL);
+            tty_clear(NULL);
 
 
         } else if (strcmp(input, "CPUID") == 0) {
@@ -263,11 +276,13 @@ void main(void) {
             // Simple console output
             printf("Hello, world!\n");
 
+            puts("Bye, world!");
+
             // Formatted output with values
             printf("Integer: %d, String: %s\n", 42, "test");
 
             // Using serial output
-            fprintf(serial, "Debug message: %s\n", "Something went wrong");
+            fprintf(serial, "Serial test: %s\n", "This is a TEST!");
 
             // Storing formatted output in a buffer
             char mybuffer[100];
@@ -289,14 +304,14 @@ void main(void) {
             for (uint8_t i = 0; i < 7; i++) {
                 printf(" %s\n",
                 strcmp(input, "RAND") == 0 ?
-                    itoa(randomGet()):              // For RAND: use full unsigned range
-                    itoa(randomGet() & 0x7FFFFFFF)  // For URAND: mask to positive range
+                    itoa(rng_next()):              // For RAND: use full unsigned range
+                    itoa(rng_next() & 0x7FFFFFFF)  // For URAND: mask to positive range
                 );
             }
 
 
         } else if (strcmp(input, "HELP") == 0) {
-            ttyPrintLog(INFO "Availible commands:\n");
+            tty_printl(INFO "Availible commands:\n");
             printf(" * %-15s -> %s\n", "HALT",          "Halt the CPU and stop the system");
             printf(" * %-15s -> %s\n", "SHUTDOWN",      "Perform a system shutdown process");
             printf(" * %-15s -> %s\n", "REBOOT",        "Perform a system reboot process");
@@ -549,12 +564,12 @@ void main(void) {
 
                 if (file && directory) {
                     bfsCopyFile(file, directory, NULL);
-                    ttyPrintLog(INFO "File copied successfully\n\r");
+                    tty_printl(INFO "File copied successfully\n\r");
                 } else {
-                    ttyPrintLog(FAIL "Cannot find the source file or destination directory\n\r");
+                    tty_printl(FAIL "Cannot find the source file or destination directory\n\r");
                 }
             } else {
-                ttyPrintLog(FAIL "Invalid command format\n\r");
+                tty_printl(FAIL "Invalid command format\n\r");
             }
 
         } else {

@@ -7,7 +7,7 @@
  * @param bcd   Binary Coded Decimal value
  * @return  The corresponding binary number
  */
-uint8_t getBCD(uint8_t bcd) {
+inline uint8_t getBCD(uint8_t bcd) {
     /*
     * Decimal:    0     1     2     3     4     5     6     7     8     9
     * BCD:      0000  0001  0010  0011  0100  0101  0110  0111  1000  1001
@@ -22,7 +22,7 @@ uint8_t getBCD(uint8_t bcd) {
  * @param bin   Binary numer value
  * @return  The corresponding BCD number
  */
-uint8_t getBIN(uint8_t bin) {
+inline uint8_t getBIN(uint8_t bin) {
     /*
     * BCD:      0000  0001  0010  0011  0100  0101  0110  0111  1000  1001
     * Decimal:    0     1     2     3     4     5     6     7     8     9
@@ -34,7 +34,7 @@ uint8_t getBIN(uint8_t bin) {
 /**
  * Get a pointer to the Detected Hardware from the Bios Data Area
  */
-uint16_t getBDA(void) {
+inline uint16_t getBDA(void) {
     const uint16_t* bda = (const uint16_t*) 0x410;
     return *bda;
 }

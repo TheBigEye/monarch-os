@@ -7,5 +7,6 @@
 void bglPlayWork(void);
 void bglPlayDemo(void);
 void bglPlayDemoEx(void);
+void bglPlayTextDemo(void);
 
 #endif /* _KERNEL_GRAPHICS_DEMO_H */

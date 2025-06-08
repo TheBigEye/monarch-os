@@ -1,9 +1,13 @@
 #include "demo.h"
 #include "draw.h"
+#include "font.h"
 
-#include "../binaries.h"
+#include "../../boot/binaries.h"
+#include "../../common/random.h"
+
 #include "../CPU/PIT/timer.h"
-#include "../drivers/graphics.h"
+#include "../drivers/FBC/graphics.h"
+#include "../drivers/VGA/video.h"
 
 
 void bglPlayWork(void) {
@@ -53,6 +57,16 @@ void bglPlayDemo(void) {
         bglDestroySurface(screen);    // Oops, clean up and return if we fail
         return;
     }
+
+    Font* smaller_font = bglCreateFont(small_font, 8, 8, NULL);
+    if (!smaller_font) {
+        bglDestroySurface(background); // Clean up if we fail
+        bglDestroySurface(screen);
+        return;
+    }
+
+    Rect textRect = (Rect) {8, 8, 0, 0};
+    bglDrawText(background, smaller_font, "Graphics Test 01", &textRect, PX_WHITE, PX_BLACK);
 
     // Now, we create special surfaces for our shapes
     // This way we only need to draw them once, then we can reuse them!
@@ -151,8 +165,12 @@ void bglPlayDemo(void) {
     // Cleanup resources
     bglDestroySurface(screen);
     bglDestroySurface(background);
+
+    bglDestroyFont(smaller_font);
+
     bglDestroySurface(squareSurface);
     bglDestroySurface(circleSurface);
+
     bglDestroyDirtyRectList(dirtyRects);
 }
 
@@ -171,6 +189,16 @@ void bglPlayDemoEx(void) {
         bglDestroySurface(screen);
         return;
     }
+
+    Font* smaller_font = bglCreateFont(small_font, 8, 8, NULL);
+    if (!smaller_font) {
+        bglDestroySurface(background); // Clean up if we fail
+        bglDestroySurface(screen);
+        return;
+    }
+
+    Rect textRect = (Rect) {8, 8, 0, 0};
+    bglDrawText(background, smaller_font, "Graphics Test 02", &textRect, PX_WHITE, PX_BLACK);
 
     Surface* spritesheet = bglCreateSurfaceFrom(bigeye_480, 480, 480);
     if (!spritesheet) {
@@ -244,7 +272,154 @@ void bglPlayDemoEx(void) {
     // Cleanup
     bglDestroySurface(screen);
     bglDestroySurface(background);
+    bglDestroyFont(smaller_font);
     bglDestroySurface(spritesheet);
     bglDestroySurface(sprite);
+    bglDestroyDirtyRectList(dirtyRects);
+}
+
+
+void bglPlayTextDemo(void) {
+    Surface* screen = bglCreateSurface(640, 480);
+    if (!screen) return;
+
+    Surface* background = bglCreateSurfaceFrom(myhill_640, 640, 480);
+    if (!background) {
+        bglDestroySurface(screen);
+        return;
+    }
+
+    // Create fonts with different scales
+    Font* smaller_font = bglCreateFont(small_font, 8, 8, 1);
+    Font* medium_font = bglCreateFont(small_font, 8, 8, 2);
+    Font* large_font = bglCreateFont(small_font, 8, 8, 3);
+
+    if (!smaller_font || !medium_font || !large_font) {
+        bglDestroySurface(background);
+        bglDestroySurface(screen);
+        if (smaller_font) bglDestroyFont(smaller_font);
+        if (medium_font) bglDestroyFont(medium_font);
+        if (large_font) bglDestroyFont(large_font);
+        return;
+    }
+
+
+    Rect textRect = (Rect) {8, 8, 0, 0};
+    bglDrawText(background, smaller_font, "Graphics Test 03", &textRect, PX_WHITE, PX_BLACK);
+
+    // Create dirty rect list, 16 for old and new positions of 8 texts
+    DirtyRectList* dirtyRects = bglCreateDirtyRectList(16);
+    if (!dirtyRects) {
+        bglDestroyFont(smaller_font);
+        bglDestroyFont(medium_font);
+        bglDestroyFont(large_font);
+        bglDestroySurface(background);
+        bglDestroySurface(screen);
+        return;
+    }
+
+    // Copy background to screen initially
+    bglBlit(background, NULL, screen, NULL);
+    bglBlitToScreen(screen, NULL, 0, 0);
+
+    // Initialize text positions spread across the screen
+    uint16_t text_x[8] = {50, 350, 50, 350, 50, 350, 50, 350};
+    uint16_t text_y[8] = {50, 50, 150, 150, 250, 250, 350, 350};
+    int8_t text_dx[8] = {2, -2, 2, -2, 2, -2, 2, -2};
+    int8_t text_dy[8] = {2, -2, -2, 2, 2, -2, -2, 2};
+
+    const uint8_t text_color[8] = {
+        PX_WHITE,
+        PX_GREEN,
+        PX_BLUE,
+        PX_DKGRAY,
+        PX_CYAN,
+        PX_MAGENTA,
+        PX_WHITE,
+        PX_LTGRAY
+    };
+
+    const uint8_t text_bgcolor[8] = {
+        PX_BLACK,
+        PX_WHITE,
+        PX_YELLOW,
+        PX_LTGRAY,
+        PX_LTRED,
+        PX_LTGREEN,
+        PX_BLACK,
+        PX_MAGENTA
+    };
+
+    const char* text[8] = {
+        "Hello BGL!",
+        "Graphics Demo",
+        "Pretty Cool",
+        "Fast & Smooth",
+        "Text Engine",
+        "Butterfly OS",
+        "Moving Text",
+        "Demo System"
+    };
+
+    Rect text_rects[8] = {0};
+    Font* fonts[8];
+
+    // Pre-calculate initial text rectangles and assign fonts
+    for (int i = 0; i < 8; i++) {
+        fonts[i] = (i % 3 == 0) ? smaller_font : (i % 3 == 1) ? medium_font : large_font;
+
+        text_rects[i].x = text_x[i];
+        text_rects[i].y = text_y[i];
+        bglGetTextSize(fonts[i], text[i], &text_rects[i].w, &text_rects[i].h);
+    }
+
+    uint16_t frame = 0;
+    while (frame++ < 512) {
+        bglClearDirtyRects(dirtyRects);
+
+        for (int i = 0; i < 8; i++) {
+            // Store old position
+            Rect old_rect = text_rects[i];
+
+            // Update position
+            text_x[i] += text_dx[i];
+            text_y[i] += text_dy[i];
+
+            // Bounce off edges
+            if (text_x[i] <= 0 || text_x[i] >= 640 - text_rects[i].w) {
+                text_dx[i] = -text_dx[i];
+                text_x[i] += text_dx[i];
+            }
+            if (text_y[i] <= 0 || text_y[i] >= 480 - text_rects[i].h) {
+                text_dy[i] = -text_dy[i];
+                text_y[i] += text_dy[i];
+            }
+
+            // Update rectangle position
+            text_rects[i].x = text_x[i];
+            text_rects[i].y = text_y[i];
+
+            // Add both old and new positions to dirty rects
+            bglAddDirtyRect(dirtyRects, &old_rect);
+            bglAddDirtyRect(dirtyRects, &text_rects[i]);
+        }
+
+        // Restore background in all dirty regions at once
+        bglUpdateRects(screen, background, dirtyRects);
+
+        // Draw all texts in their new positions
+        for (int i = 0; i < 8; i++) {
+            bglDrawText(screen, fonts[i], text[i], &text_rects[i], text_color[i], text_bgcolor[i]);
+        }
+
+        bglBlitToScreen(screen, NULL, 0, 0);
+    }
+
+    // Cleanup
+    bglDestroyFont(smaller_font);
+    bglDestroyFont(medium_font);
+    bglDestroyFont(large_font);
+    bglDestroySurface(screen);
+    bglDestroySurface(background);
     bglDestroyDirtyRectList(dirtyRects);
 }

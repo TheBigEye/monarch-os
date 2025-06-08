@@ -47,6 +47,8 @@ int vfprintf(FILE *stream, const char *format, va_list args);
 int vsprintf(char *buffer, const char *format, va_list args);
 int vsnprintf(char *buffer, size_t size, const char *format, va_list args);
 
+int puts(char *string);
+
 /* Get input string */
 char *gets(void);
 

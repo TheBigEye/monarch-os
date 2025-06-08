@@ -52,7 +52,7 @@ const uint8_t key_layout[128][2] = {
     {']', '}'}, /* R Bracket         | R Brace           | 0x1B */
     {'\n', '\n'}, /* Enter           | Enter             | 0x1C */
 
-    { 0 ,  0 }, /* Caps Lock         | None              | 0x3A */
+    { 0 ,  0 }, /* Control           | None              | 0x1D */
     {'A', 'a'}, /* A upper key       | a lower key       | 0x1E */
     {'S', 's'}, /* S upper key       | s lower key       | 0x1F */
     {'D', 'd'}, /* D upper key       | d lower key       | 0x20 */
@@ -111,16 +111,22 @@ const uint8_t key_layout[128][2] = {
     { 0 ,  0 }, /* Insert            | None              | 0x52 */
     { 0 ,  0 }, /* Delete            | None              | 0x53 */
 
-    { 0 ,  0 }, /* Unknown           | Unknown           | 0x54 */
+    { 0 ,  0 }, /* PrtSc             | SysRq             | 0x54 */
     { 0 ,  0 }, /* Unknown           | Unknown           | 0x55 */
     { 0 ,  0 }, /* Unknown           | Unknown           | 0x56 */
 
     { 0 ,  0 }, /* F11               | None              | 0x57 */
     { 0 ,  0 }, /* F12               | None              | 0x58 */
+
+    { 0 ,  0 }, /* Unknown           | Unknown           | 0x59 */
+    { 0 ,  0 }, /* Unknown           | Unknown           | 0x5A */
+    { 0 ,  0 }, /* Left Windows      | None              | 0x5B */
+    { 0 ,  0 }, /* Right Windows     | None              | 0x5C */
+    { 0 ,  0 }, /* Right Click       | None              | 0x5D */
+    { 0 ,  0 }, /* Unknown           | Unknown           | 0x5E */
+    { 0 ,  0 }, /* Unknown           | Unknown           | 0x5F */
+
 };
-
-/* TODO: Implement getchr() and basic input routines from C */
-
 
 
 /**

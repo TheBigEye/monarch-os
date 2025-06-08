@@ -8,7 +8,7 @@
 static uint32_t getSegment(void) {
     uint32_t segment;
 
-    writeByteToPort(GRAPHICS_INDEX, 6);
+    writeByteToPort(GRAPHICS_INDEX, 0x06);
     segment = readByteFromPort(GRAPHICS_DATA);
 
     segment >>= 2;
@@ -34,7 +34,7 @@ static inline uint8_t readRegister(uint16_t port, uint8_t reg) {
 }
 
 static inline void writeVideoMemory(uint32_t destOffset, uint8_t *source, uint32_t count) {
-    memoryCopy((void *)(getSegment() + destOffset), (void *) source, count);
+    fastMemoryCopy((void *)(getSegment() + destOffset), (void *) source, count);
 }
 
 static void setPlane(uint8_t plane) {
@@ -111,7 +111,7 @@ static void writeFont(uint8_t *buffer, uint8_t fontHeight) {
     // Set the plane to 2 for font writing
     setPlane(2);
 
-    /* @see https://forum.osdev.org/viewtopic.php?p=160494 */
+    /* https://forum.osdev.org/viewtopic.php?p=160494 ¯\_(ツ)_/¯ */
 
     // Write the font data to video memory, one character at a time
     for (uint16_t i = 0; i < 256; i++) {
@@ -131,6 +131,8 @@ static void writeFont(uint8_t *buffer, uint8_t fontHeight) {
         * - The memory operation here directly overwrites the area where the BIOS
         *   stores a copy of its default font. By overwriting this memory region,
         *   we can change the font that is used by the system. Cool, right?
+        *
+        *  https://wiki.osdev.org/VGA_Hardware#Memory_Layout_in_text_modes
         */
 
         writeVideoMemory(16384U * 0 + i * 32, buffer, fontHeight);
@@ -209,6 +211,7 @@ void initializeVGA(uint8_t *registers) {
     (void) readByteFromPort(INPUT_STATE_READ);
     writeByteToPort(ATTRIBUTE_INDEX, 0x20);
 
+    // If inst an pixel based mode ...
     if (!registers[62]) {
         writeFont(small_font, 8);
     }

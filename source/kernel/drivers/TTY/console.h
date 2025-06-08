@@ -44,13 +44,6 @@
 #define TTY_CURSOR_HIDE   0x3F
 
 
-/**
- * Set the shape of the cursor.
- *
- * @param shape The new shape of the cursor.
- */
-void setCursor(uint8_t shape);
-
 
 /**
  * Clear the text-mode screen content and change color scheme
@@ -58,7 +51,7 @@ void setCursor(uint8_t shape);
  * @param color The color to which the screen will be set
  * @note If the color is NULL, the screen will be cleaned with the default scheme
  */
-void setScreen(uint8_t color);
+void tty_clear(uint8_t color);
 
 
 /**
@@ -75,7 +68,7 @@ void setScreen(uint8_t color);
  *
  * @return The new offset of the cursor in video memory.
  */
-int ttyPutChar(const char character, int col, int row, uint8_t color);
+int tty_plotc(char character, int col, int row, uint8_t color);
 
 
 /**
@@ -88,13 +81,7 @@ int ttyPutChar(const char character, int col, int row, uint8_t color);
  * @param row     The row index of the position.
  * @param color   The color attribute of the message.
  */
-int ttyPutText(const char *string, int col, int row, uint8_t color);
-
-
-/**
- * Get and print all the avialible charaters from the BIOS charset
- */
-void ttyCharset(void);
+int tty_plots(const char *string, int col, int row, uint8_t color);
 
 
 /**
@@ -102,7 +89,7 @@ void ttyCharset(void);
  *
  * @param string The string to print.
  */
-void ttyPrintStr(const char *string);
+void tty_prints(const char *string);
 
 
 /**
@@ -112,10 +99,27 @@ void ttyPrintStr(const char *string);
  *
  * @param string The string to print.
  */
-void ttyPrintLog(const char *string);
+void tty_printl(const char *string);
 
 
-void moveCursor(uint16_t col, uint16_t row);
+/**
+ * Get and print all the avialible charaters from the BIOS charset
+ */
+void tty_probe(void);
+
+
+/**
+ * @brief Moves the hardware cursor to the specified position in the text mode console
+ *
+ * @param shape The new shape of the cursor.
+ * @param col Number of columns to move right from current position (X offset).
+ * @param row Number of rows to move down from current position (Y offset).
+ *
+ * @note Position is bound-checked against TEXTMODE_WIDTH and TEXTMODE_HEIGHT.
+ * If the resulting position would be out of bounds, the function returns without
+ * moving the cursor.
+ */
+void tty_cursor(uint8_t shape, uint16_t col, uint16_t row);
 
 
 #endif /* DRIVER_SCREEN_H_ */

@@ -65,6 +65,7 @@ int atoi(const char *string) {
     return base * sign;
 }
 
+
 /**
  * Convert an integer to a string.
  *
@@ -222,7 +223,7 @@ char *htoa(int integer) {
  * Calculate the length of a string
  */
 int strlen(const char *string) {
-    const char *pointer = string;
+    register const char *pointer = string;
     while (*(pointer++));
     return pointer - string - 1;
 }

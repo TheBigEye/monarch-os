@@ -7,7 +7,7 @@
 
 /* Output destinations */
 typedef enum {
-    OUTPUT_CONSOLE,  // Console output using ttyPutChar
+    OUTPUT_CONSOLE,  // Console output using tty_plotc
     OUTPUT_SERIAL,   // Serial output using comPrintChr
     OUTPUT_BUFFER    // String buffer output
 } OutputDest;
@@ -31,7 +31,7 @@ static inline void write_char(OutputHandler *handler, char c) {
 
     switch (handler->destination) {
         case OUTPUT_CONSOLE:
-            ttyPutChar(c, -1, -1, (BG_BLACK | FG_DKGRAY));  // Use dark gray for values
+            tty_plotc(c, -1, -1, (BG_BLACK | FG_DKGRAY));  // Use dark gray for values
             break;
         case OUTPUT_SERIAL:
             comPrintChr(c);
@@ -84,7 +84,7 @@ static int format_output(OutputHandler *handler, const char *format, va_list arg
         // Handle regular characters
         if (*format != '%') {
             if (handler->destination == OUTPUT_CONSOLE) {
-                ttyPutChar(*format++, -1, -1, (BG_BLACK | FG_LTGRAY));  // Regular text in light gray
+                tty_plotc(*format++, -1, -1, (BG_BLACK | FG_LTGRAY));  // Regular text in light gray
             } else {
                 write_char(handler, *format++);
             }
@@ -545,7 +545,7 @@ int printf(const char *format, ...) {
  * @brief Print a formatted string to the standard output with a ANSI color escape sequence
  */
 int printl(const char *prompt, const char *format, ...) {
-    ttyPrintLog(prompt);
+    tty_printl(prompt);
     va_list args;
     va_start(args, format);
     int result = vprintf(format, args);
@@ -593,6 +593,21 @@ int snprintf(char *buffer, size_t size, const char *format, ...) {
 
 
 /**
+ * @brief Print a string with a newline character
+ */
+int puts(char *string) {
+    int i = 0;
+
+    while (string[i] != '\0') {
+        tty_plotc(string[i], -1, -1, NULL);
+        i++;
+    }
+    tty_plotc('\n', -1, -1, NULL);
+    return i;
+}
+
+
+/**
  * @brief Get a input string
  */
 char *gets(void) {
@@ -601,7 +616,7 @@ char *gets(void) {
     char *head = buffer;
     char *tail = buffer + sizeof(buffer) - 1;
 
-    setCursor(0x00);
+    tty_cursor(0x00, 0, 0);
 
     while (true) {
         if (scancode == 0x00) {
@@ -619,39 +634,25 @@ char *gets(void) {
             *head = '\0';
             scancode = 0x00;
 
-            ttyPutText(output, -1, -1, (BG_BLACK | FG_LTGRAY));
+            tty_plots(output, -1, -1, NULL);
             return buffer;
 
         } else if (character == '\b') {
             if (head > buffer) {
                 head--;
-                ttyPutText(output, -1, -1, (BG_BLACK | FG_LTGRAY));
+                tty_plots(output, -1, -1, NULL);
             }
-
-        /*
-        } else if (scancode == 0x4B) { // Left arrow
-            if (csr_x > 0) {
-                csr_x--;
-                move_csr();
-            }
-
-        } else if (scancode == 0x4D) { // Right arrow
-            if (csr_x < 79) {
-                csr_x++;
-                move_csr();
-            }
-        */
 
         } else if (character >= ' ' && head < tail) {
             *head++ = character;
-            ttyPutText(output, -1, -1, (BG_BLACK | FG_LTGRAY));
+            tty_plots(output, -1, -1, NULL);
 
         } else if (character == '\t') {
             for (int i = 4; i > 0; i--) {
                 if (head < tail) {
                     *head++ = ' ';
                 }
-                ttyPutChar(' ', -1, -1, (BG_BLACK | FG_LTGRAY));
+                tty_plotc(' ', -1, -1, NULL);
             }
         }
 

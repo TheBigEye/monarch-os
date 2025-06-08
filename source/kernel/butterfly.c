@@ -37,14 +37,14 @@ void butterfly(multiboot_info_t* multiboot_header, uint32_t boot_magic) {
     initializeVGA(text_mode);
 
     // Clear the screen's trash
-    setScreen(NULL);
+    tty_clear(NULL);
 
     initializeGDT(); // Install the General Descriptor Table
     initializeISR(); // Intall exception handlers
     initializeIRQ(); // Install drivers
 
     // Clear debug messages ...
-    setScreen(NULL);
+    tty_clear(NULL);
 
     /* Initialize heap and paging */
     initializeMemory(&kernel_tail);
@@ -52,43 +52,40 @@ void butterfly(multiboot_info_t* multiboot_header, uint32_t boot_magic) {
 
     /* ........ */
 
-    setScreen(NULL);
+    tty_clear(NULL);
 
     /** NOTE: We need initialize the Heap before the File System */
     mountFileSystem();
 
     // We show a nice welcome screen fisrt ...
     initializeVGA(video_mode);
-    fillScreen(PX_BLACK);
+    gfx_clear(PX_BLACK);
 
     bglPlayWork();
 
     timerSleep(1500);
-    fillScreen(PX_BLACK);
+    gfx_clear(PX_BLACK);
 
     initializeVGA(text_mode);
 
-    setScreen(NULL);
-    setCursor(0x3F);
+    tty_clear(NULL);
+    tty_cursor(0x3F, -1, -1);
 
-    ttyPutText(butterfly_logo, 0, 1, (BG_BLACK | FG_CYAN));
+    tty_plots(butterfly_logo, 0, 1, (BG_BLACK | FG_CYAN));
     startupSound();
 
-    ttyPutText(" Monarch OS - Under development ", 28, 20, (BG_BLACK | FG_DKGRAY));
-    ttyPutText(" (C) 2022-2025 ", 36, 21, (BG_BLACK | FG_DKGRAY));
+    tty_plots(" Monarch OS - Under development ", 28, 20, (BG_BLACK | FG_DKGRAY));
+    tty_plots(" (C) 2022-2025 ", 36, 21, (BG_BLACK | FG_DKGRAY));
 
-    ttyPrintStr("\n\n");
+    tty_prints("\n\n");
 
     memoryGetStatus();
     //dumpMultiboot();
 
     // We use the PIT and CPU ticks like the RNG seed
-    randomSet(timerGetTicks() + processorGetTicks());
+    rng_seed(timerGetTicks() + processorGetTicks());
 
-    // We init the keyboard calls
-    while (true) {
-        main();
-    }
+    main();
 }
 
 

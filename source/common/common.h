@@ -21,6 +21,10 @@
 
         #define NULL ((void *) 0UL)
 
+        #ifndef EOF
+        # define EOF (-1)
+        #endif
+
         #define INF __builtin_inf()
         #define NAN __builtin_nan("")
 

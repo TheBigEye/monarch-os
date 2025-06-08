@@ -1,5 +1,7 @@
 #include "bugfault.h"
 
+#include "../boot/binaries.h"
+
 #include "CPU/ISR/ISR.h"
 #include "CPU/PIT/timer.h"
 #include "CPU/HAL.h"
@@ -8,8 +10,6 @@
 #include "modules/terminal.h"
 #include "drivers/speaker.h"
 #include "drivers/power.h"
-
-#include "binaries.h"
 
 /**
  * If you're reading this, it's because you've probably broken something and want to cheat
@@ -25,7 +25,7 @@ static void printStackTrace(unsigned int ebp, int col, int row) {
         // (which is itself just above EBP on the stack)
         uint32_t method = *(stack + 1); // CWE-125 - Out Of Bounds Read
 
-        ttyPutText(htoa(method), col, index, (BG_BLACK | FG_LTRED));
+        tty_plots(htoa(method), col, index, (BG_BLACK | FG_LTRED));
         if (*stack != 0) {
             index++;
         }
@@ -54,41 +54,41 @@ void triggerPanic(const char *reason, uint32_t interrupt, uint32_t segment, regi
 
     ASM VOLATILE ("cli"); // DISABLE INTERRUPTS
 
-    setScreen(NULL);
-    setCursor(0x3F);
+    tty_clear(NULL);
+    tty_cursor(0x3F, -1, -1);
 
-    ttyPutText(butterfly_logo, 0, 1, (BG_BLACK | FG_LTRED));
+    tty_plots(butterfly_logo, 0, 1, (BG_BLACK | FG_LTRED));
 
-    ttyPutText(                            " Monarch OS "                                 ,  38, 20, (BG_LTGRAY | FG_BLACK));
-    ttyPutText("A 32-bit device driver has corrupted critical system memory, resulting in",   8, 23, (BG_BLACK | FG_WHITE));
-    ttyPutText("an exception at IRQ 00 and segment 0x00000000. The system has stopped now.",  8, 24, (BG_BLACK | FG_WHITE));
+    tty_plots(                            " Monarch OS "                                 ,  38, 20, (BG_LTGRAY | FG_BLACK));
+    tty_plots("A 32-bit device driver has corrupted critical system memory, resulting in",   8, 23, (BG_BLACK | FG_WHITE));
+    tty_plots("an exception at IRQ 00 and segment 0x00000000. The system has stopped now.",  8, 24, (BG_BLACK | FG_WHITE));
 
-    ttyPutText( reason,                                                                       9, 26, (BG_BLACK | FG_WHITE));
+    tty_plots( reason,                                                                       9, 26, (BG_BLACK | FG_WHITE));
 
-    ttyPutText("* The current device has been halted to prevent any damage.",                 8, 28, (BG_BLACK | FG_WHITE));
-    ttyPutText("* If a solution to the problem is not found, contact your",                   8, 29, (BG_BLACK | FG_WHITE));
-    ttyPutText("  system administrator or technical.",                                        8, 30, (BG_BLACK | FG_WHITE));
+    tty_plots("* The current device has been halted to prevent any damage.",                 8, 28, (BG_BLACK | FG_WHITE));
+    tty_plots("* If a solution to the problem is not found, contact your",                   8, 29, (BG_BLACK | FG_WHITE));
+    tty_plots("  system administrator or technical.",                                        8, 30, (BG_BLACK | FG_WHITE));
 
-    ttyPutText(itoa(interrupt),                                                              28, 24, (BG_BLACK | FG_WHITE));
-    ttyPutText(htoa(segment),                                                                43, 24, (BG_BLACK | FG_WHITE));
+    tty_plots(itoa(interrupt),                                                              28, 24, (BG_BLACK | FG_WHITE));
+    tty_plots(htoa(segment),                                                                43, 24, (BG_BLACK | FG_WHITE));
 
     if (registers) {
-        ttyPutText(" \"Uh Oh ... This isn't good ...\" ", 28, 34, (BG_BLACK | FG_LTRED));
+        tty_plots(" \"Uh Oh ... This isn't good ...\" ", 28, 34, (BG_BLACK | FG_LTRED));
 
-        ttyPutText(" [registers at interrupt] ", 31, 37, (BG_BKRED | FG_BLACK));
-        ttyPutText("eax = ", 16, 39, (BG_BLACK | FG_RED)); ttyPutText(htoa(registers->eax), 22, 39, (BG_BLACK | FG_LTRED));
-        ttyPutText("ebx = ", 36, 39, (BG_BLACK | FG_RED)); ttyPutText(htoa(registers->ebx), 42, 39, (BG_BLACK | FG_LTRED));
-        ttyPutText("ecx = ", 56, 39, (BG_BLACK | FG_RED)); ttyPutText(htoa(registers->ecx), 62, 39, (BG_BLACK | FG_LTRED));
+        tty_plots(" [registers at interrupt] ", 31, 37, (BG_BKRED | FG_BLACK));
+        tty_plots("eax = ", 16, 39, (BG_BLACK | FG_RED)); tty_plots(htoa(registers->eax), 22, 39, (BG_BLACK | FG_LTRED));
+        tty_plots("ebx = ", 36, 39, (BG_BLACK | FG_RED)); tty_plots(htoa(registers->ebx), 42, 39, (BG_BLACK | FG_LTRED));
+        tty_plots("ecx = ", 56, 39, (BG_BLACK | FG_RED)); tty_plots(htoa(registers->ecx), 62, 39, (BG_BLACK | FG_LTRED));
 
-        ttyPutText("edx = ", 16, 40, (BG_BLACK | FG_RED)); ttyPutText(htoa(registers->edx), 22, 40, (BG_BLACK | FG_LTRED));
-        ttyPutText("esp = ", 36, 40, (BG_BLACK | FG_RED)); ttyPutText(htoa(registers->esp), 42, 40, (BG_BLACK | FG_LTRED));
-        ttyPutText("ebp = ", 56, 40, (BG_BLACK | FG_RED)); ttyPutText(htoa(registers->ebp), 62, 40, (BG_BLACK | FG_LTRED));
+        tty_plots("edx = ", 16, 40, (BG_BLACK | FG_RED)); tty_plots(htoa(registers->edx), 22, 40, (BG_BLACK | FG_LTRED));
+        tty_plots("esp = ", 36, 40, (BG_BLACK | FG_RED)); tty_plots(htoa(registers->esp), 42, 40, (BG_BLACK | FG_LTRED));
+        tty_plots("ebp = ", 56, 40, (BG_BLACK | FG_RED)); tty_plots(htoa(registers->ebp), 62, 40, (BG_BLACK | FG_LTRED));
 
-        ttyPutText("error code = ", 32, 43, (BG_BLACK | FG_RED)); ttyPutText(htoa(registers->err_code), 45, 43, (BG_BLACK | FG_LTRED));
-        ttyPutText("eflags = "    , 32, 44, (BG_BLACK | FG_RED)); ttyPutText(htoa(registers->eflags), 41, 44, (BG_BLACK | FG_LTRED));
-        ttyPutText("eip = "       , 32, 45, (BG_BLACK | FG_RED)); ttyPutText(htoa(registers->eip), 38, 45, (BG_BLACK | FG_LTRED));
+        tty_plots("error code = ", 32, 43, (BG_BLACK | FG_RED)); tty_plots(htoa(registers->err_code), 45, 43, (BG_BLACK | FG_LTRED));
+        tty_plots("eflags = "    , 32, 44, (BG_BLACK | FG_RED)); tty_plots(htoa(registers->eflags), 41, 44, (BG_BLACK | FG_LTRED));
+        tty_plots("eip = "       , 32, 45, (BG_BLACK | FG_RED)); tty_plots(htoa(registers->eip), 38, 45, (BG_BLACK | FG_LTRED));
 
-        ttyPutText("[stacktrace]", 38, 48, (BG_BKRED | FG_BLACK));
+        tty_plots("[stacktrace]", 38, 48, (BG_BKRED | FG_BLACK));
         printStackTrace(registers->ebp, 39, 50);
     }
 

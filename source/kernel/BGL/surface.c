@@ -1,6 +1,6 @@
 #include "surface.h"
 
-#include "../drivers/graphics.h"
+#include "../drivers/FBC/graphics.h"
 #include "../memory/memory.h"
 #include "../memory/heap.h"
 
@@ -35,6 +35,14 @@ static bool clipRects(Rect* src, Rect* dst, Rect* clip) {
 }
 
 
+/**
+ * @brief Create a new empty surface.
+ *
+ * @param width Width of the surface in pixels.
+ * @param height Height of the surface in pixels.
+ *
+ * @return Pointer to the created Surface structure, or NULL on failure.
+ */
 Surface* bglCreateSurface(uint16_t width, uint16_t height) {
     Surface* surface = (Surface*) memoryAllocateBlock(sizeof(Surface));
     if (!surface) return NULL;
@@ -67,6 +75,15 @@ Surface* bglCreateSurface(uint16_t width, uint16_t height) {
 }
 
 
+/**
+ * @brief Create a new surface from existing pixel data.
+ *
+ * @param pixels Pointer to the pixel data array.
+ * @param width Width of the surface in pixels.
+ * @param height Height of the surface in pixels.
+ *
+ * @return Pointer to the created Surface structure, or NULL on failure.
+ */
 Surface* bglCreateSurfaceFrom(uint8_t* pixels, uint16_t width, uint16_t height) {
     Surface* surface = (Surface*) bglCreateSurface(width, height);
     if (!surface) return NULL;
@@ -77,6 +94,16 @@ Surface* bglCreateSurfaceFrom(uint8_t* pixels, uint16_t width, uint16_t height) 
 }
 
 
+/**
+ * @brief Create a sprite surface from an existing surface.
+ *
+ * @note Sprites are sub-surfaces of existing surfaces.
+ *
+ * @param parent Pointer to the parent surface.
+ * @param rect Rectangle defining the area of the sprite.
+ *
+ * @return Pointer to the created sprite surface, or NULL on failure.
+ */
 Surface* bglCreateSprite(Surface* parent, Rect rect) {
     if (!parent) {
         return NULL;
@@ -126,6 +153,9 @@ Surface* bglCreateSprite(Surface* parent, Rect rect) {
 }
 
 
+/**
+ * @brief Destroy a surface and free its resources.
+ */
 void bglDestroySurface(Surface* surface) {
     if (!surface) return;
 
@@ -138,6 +168,12 @@ void bglDestroySurface(Surface* surface) {
 }
 
 
+/**
+ * @brief Fill a surface with a solid color.
+ *
+ * @param surface Pointer to the surface to fill.
+ * @param color Color value to fill the surface with.
+ */
 void bglFillSurface(Surface* surface, uint8_t color) {
     if (!surface || !surface->pixels) return;
 
@@ -147,6 +183,14 @@ void bglFillSurface(Surface* surface, uint8_t color) {
 }
 
 
+/**
+ * @brief Blit (copy) a source surface to a destination surface with optional clipping.
+ *
+ * @param src Pointer to the source surface.
+ * @param srcrect Pointer to the source rectangle (NULL for full source).
+ * @param dst Pointer to the destination surface.
+ * @param dstrect Pointer to the destination rectangle (NULL for full destination).
+ */
 void bglBlit(Surface* src, Rect* srcrect, Surface* dst, Rect* dstrect) {
     if (!src || !dst) return;
 
@@ -210,16 +254,30 @@ void bglBlit(Surface* src, Rect* srcrect, Surface* dst, Rect* dstrect) {
 }
 
 
+/**
+ * @brief Draw the surface pixels to the hardware screen.
+ *
+ * @param surface Pointer to the surface to draw.
+ * @param srcrect Pointer to the source rectangle (NULL for full source).
+ * @param x X coordinate on the screen.
+ * @param y Y coordinate on the screen.
+ */
 void bglBlitToScreen(Surface* surface, Rect* srcrect, uint16_t x, uint16_t y) {
     if (!surface) return;
 
     Rect sr = srcrect ? *srcrect : (Rect) {0, 0, surface->w, surface->h};
 
     // Draw directly to screen using existing function
-    drawBitmapFast(surface->pixels, x, y, sr.w, sr.h);
+    gfx_draw(surface->pixels, x, y, sr.w, sr.h);
 }
 
 
+/**
+ * @brief Set the transparency color key for a surface.
+ *
+ * @param surface Pointer to the surface.
+ * @param color Color value to set as the color key.
+ */
 void bglSetColorKey(Surface* surface, uint8_t color) {
     if (!surface) return;
     // Store the full color value - will use >> 4 when comparing
@@ -228,12 +286,24 @@ void bglSetColorKey(Surface* surface, uint8_t color) {
 }
 
 
+/**
+ * @brief Set the blend mode for a surface.
+ *
+ * @param surface Pointer to the surface.
+ * @param mode Blend mode to set.
+ */
 void bglSetBlendMode(Surface* surface, BlendMode mode) {
     if (!surface) return;
     surface->blend_mode = mode;
 }
 
 
+/**
+ * @brief Set the clipping rectangle for a surface.
+ *
+ * @param surface Pointer to the surface.
+ * @param rect Pointer to the rectangle to set (NULL for full surface).
+ */
 void bglSetClipRect(Surface* surface, Rect* rect) {
     if (!surface) return;
     if (!rect) {
@@ -245,6 +315,3 @@ void bglSetClipRect(Surface* surface, Rect* rect) {
         surface->clip_rect = *rect;
     }
 }
-
-
-

@@ -17,6 +17,9 @@ static void mergeRects(Rect* r1, Rect* r2) {
 }
 
 
+/**
+ * @brief Create a new dirty rectangle list.
+ */
 DirtyRectList* bglCreateDirtyRectList(uint16_t max_rects) {
     if (max_rects > MAX_DIRTY_RECTS) max_rects = MAX_DIRTY_RECTS;
     DirtyRectList* list = (DirtyRectList*) memoryAllocateBlock(sizeof(DirtyRectList));
@@ -28,11 +31,20 @@ DirtyRectList* bglCreateDirtyRectList(uint16_t max_rects) {
 }
 
 
+/**
+ * @brief Destroy a dirty rectangle list.
+ */
 void bglDestroyDirtyRectList(DirtyRectList* list) {
     if (list) memoryFreeBlock(list);
 }
 
 
+/**
+ * @brief Add a dirty rectangle to the list.
+ *
+ * @param list The dirty rectangle list.
+ * @param rect The rectangle to add.
+ */
 void bglAddDirtyRect(DirtyRectList* list, Rect* rect) {
     if (!list || !rect || list->count >= list->max) return;
 
@@ -54,11 +66,17 @@ void bglAddDirtyRect(DirtyRectList* list, Rect* rect) {
 }
 
 
+/**
+ * @brief Clear the dirty rectangle list.
+ */
 void bglClearDirtyRects(DirtyRectList* list) {
     if (list) list->count = 0;
 }
 
 
+/**
+ * @brief Update and redraw the dirty rectangles on the destination surface.
+ */
 inline void bglUpdateRects(Surface* dst, Surface* src, DirtyRectList* list) {
     if (!dst || !src || !list) return;
 
@@ -69,6 +87,9 @@ inline void bglUpdateRects(Surface* dst, Surface* src, DirtyRectList* list) {
 }
 
 
+/**
+ * @brief Update a specific rectangle on the destination surface.
+ */
 inline void bglUpdateRect(Surface* dst, Surface* src, Rect* rect) {
     if (!dst || !src || !rect) return;
 
@@ -76,7 +97,14 @@ inline void bglUpdateRect(Surface* dst, Surface* src, Rect* rect) {
 }
 
 
-
+/**
+ * @brief Set a pixel in the surface.
+ *
+ * @param surface The surface to set the pixel on.
+ * @param x The x coordinate of the pixel.
+ * @param y The y coordinate of the pixel.
+ * @param color The color to set the pixel to.
+ */
 inline void bglSetPixel(Surface* surface, uint16_t x, uint16_t y, uint8_t color) {
     if (!surface || x >= surface->w || y >= surface->h) return;
 
@@ -90,7 +118,14 @@ inline void bglSetPixel(Surface* surface, uint16_t x, uint16_t y, uint8_t color)
 }
 
 
-
+/**
+ * @brief Get a pixel from the surface.
+ *
+ * @param surface The surface to get the pixel from.
+ * @param x The x coordinate of the pixel.
+ * @param y The y coordinate of the pixel.
+ * @return The color of the pixel.
+ */
 inline uint8_t bglGetPixel(Surface* surface, uint16_t x, uint16_t y) {
     if (!surface || !surface->pixels || x >= surface->w || y >= surface->h) return 0;
 
@@ -125,6 +160,7 @@ void bglDrawLine(Surface* surface, uint16_t x1, uint16_t y1, uint16_t x2, uint16
 
 void bglDrawRect(Surface* surface, Rect* rect, uint8_t color) {
     if (!surface || !rect) return;
+
     bglDrawLine(surface, rect->x, rect->y, rect->x + rect->w, rect->y, color);
     bglDrawLine(surface, rect->x, rect->y + rect->h, rect->x + rect->w, rect->y + rect->h, color);
     bglDrawLine(surface, rect->x, rect->y, rect->x, rect->y + rect->h, color);
@@ -168,7 +204,7 @@ void bglDrawCircle(Surface* surface, uint16_t x0, uint16_t y0, uint16_t radius, 
             y += 1;
             err += 2*y + 1;
         }
-        
+
         if (err > 0) {
             x -= 1;
             err -= 2*x + 1;

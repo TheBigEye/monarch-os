@@ -2,7 +2,7 @@
 
 /* Kernel name */
 const char * __kernel_name = "butterfly";
-const char * __kernel_version = "1.9.0";
+const char * __kernel_version = "1.9.1";
 
 /*
  * The release codename.

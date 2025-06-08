@@ -13,7 +13,7 @@ void powerControl(int status) {
 
     switch (status) {
         case POWER_HALT:
-            ASM VOLATILE ("hlt"); // Halt the CPU
+            FOREVER ASM VOLATILE ("hlt"); // Halt the CPU
             break;
 
         case POWER_REBOOT:
@@ -21,7 +21,7 @@ void powerControl(int status) {
             while (readByteFromPort(0x64) & 0x02);
 
             writeByteToPort(0x64, 0xFE); // Send the reboot command
-            ASM VOLATILE ("hlt"); // Halt the CPU
+            FOREVER ASM VOLATILE ("hlt"); // Halt the CPU
             break;
 
         case POWER_SHUTDOWN:
@@ -29,7 +29,7 @@ void powerControl(int status) {
             writeWordToPort(0x604, 0x2000); // QEMU (BIOS)
             writeWordToPort(0x4004, 0x3400); // VirtualBox (BIOS)
 
-            ASM VOLATILE ("hlt"); // Halt the CPU
+            FOREVER ASM VOLATILE ("hlt"); // Halt the CPU
             break;
 
         default:

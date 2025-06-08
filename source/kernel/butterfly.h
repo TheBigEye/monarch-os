@@ -1,9 +1,11 @@
 #ifndef _KERNEL_BUTTERFLY_H
 #define _KERNEL_BUTTERFLY_H 1
 
-#include "../common/multiboot.h"
+#include "../boot/binaries.h"
+#include "../boot/bootmain.h"
+
 #include "../common/common.h"
-#include "../common/randomly.h"
+#include "../common/random.h"
 
 #include "BFS/filesystem.h"
 #include "BGL/demo.h"
@@ -18,9 +20,9 @@
 
 #include "drivers/ATA/ata.h"
 #include "drivers/COM/serial.h"
+#include "drivers/FBC/graphics.h"
 #include "drivers/TTY/console.h"
 #include "drivers/VGA/video.h"
-#include "drivers/graphics.h"
 #include "drivers/keyboard.h"
 #include "drivers/speaker.h"
 #include "drivers/power.h"
@@ -33,7 +35,6 @@
 #include "modules/calendar.h"
 #include "modules/terminal.h"
 
-#include "binaries.h"
 #include "bugfault.h"
 #include "version.h"
 

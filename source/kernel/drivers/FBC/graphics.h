@@ -1,7 +1,7 @@
 #ifndef DRIVER_GRAPHICS_H_
 #define DRIVER_GRAPHICS_H_ 1
 
-#include "../../common/common.h"
+#include "../../../common/common.h"
 
 /**
 * Theoretically there are 16 colors, but it seems that
@@ -26,8 +26,6 @@
 #define PX_WHITE            0xFF // White pixel color
 
 
-
-
 /**
  * Sets the color of a single pixel on the screen.
  *
@@ -36,7 +34,7 @@
  * @param x The x-coordinate of the pixel.
  * @param y The y-coordinate of the pixel.
  */
-void plotPixel(uint8_t color, uint16_t x, uint16_t y);
+void gfx_plotp(uint8_t color, uint16_t x, uint16_t y);
 
 
 /**
@@ -46,7 +44,7 @@ void plotPixel(uint8_t color, uint16_t x, uint16_t y);
  * @param y The y-coordinate of the pixel
  * @return The color value of the pixel (0-15), or 0 if the coordinates are out of bounds
  */
-uint8_t readPixel(uint16_t x, uint16_t y);
+uint8_t gfx_readp(uint16_t x, uint16_t y);
 
 
 /**
@@ -54,11 +52,11 @@ uint8_t readPixel(uint16_t x, uint16_t y);
  *
  * @param color The color to fill the screen with.
  */
-void fillScreen(uint8_t color);
+void gfx_clear(uint8_t color);
 
 
 /**
- * @brief Draws a bitmap on the screen plane by plane.
+ * @brief Draws a bitmap on the screen.
  *
  * @note Supports up to 4 color planes, allowing 16-color graphics (4 bits per pixel).
  *
@@ -67,48 +65,16 @@ void fillScreen(uint8_t color);
  * @param y         Y coordinate of the top left corner of the bitmap.
  * @param w         Width of the bitmap in pixels.
  * @param h         Height of the bitmap in pixels.
- *
- * @deprecated This is slow, we should use the fast double-bufferd version
  */
-void drawBitmap(uint8_t *pixels, uint16_t x, uint16_t y, uint16_t w, uint16_t h);
+void gfx_draw(uint8_t *pixels, uint16_t x, uint16_t y, uint16_t w, uint16_t h);
 
+void gfx_plotl(uint8_t color, uint16_t fx, uint16_t fy, uint16_t sx, uint16_t sy);
+void gfx_plotr(uint8_t color, uint16_t x, uint16_t y, uint16_t w, uint16_t h, bool solid);
+void gfx_ploto(uint8_t color, uint16_t cx, uint16_t cy, uint16_t r, bool solid);
 
-/**
- * @brief Draws a bitmap on the screen (fast version).
- *
- * @note Uses double-buffering to copy the bitmap completely in each plane.
- *
- * @param pixels    Pointer to the bitmap pixel data.
- * @param x         X coordinate of the top left corner of the bitmap.
- * @param y         Y coordinate of the top left corner of the bitmap.
- * @param w         Width of the bitmap in pixels.
- * @param h         Height of the bitmap in pixels.
- */
-void drawBitmapFast(uint8_t *pixels, uint16_t x, uint16_t y, uint16_t w, uint16_t h);
+void gfx_plotc(unsigned char character, uint16_t x, uint16_t y, uint8_t color);
+void gfx_plots(const char *string, uint16_t x, uint16_t y, uint8_t color);
 
-
-void drawLine(uint8_t color, uint16_t fx, uint16_t fy, uint16_t sx, uint16_t sy);
-
-
-void drawEmptyRect(uint8_t color, uint16_t x, uint16_t y, uint16_t w, uint16_t h);
-
-
-void drawSolidRect(uint8_t color, uint16_t x, uint16_t y, uint16_t w, uint16_t h);
-
-
-void drawEmptyCircle(uint8_t color, uint16_t cx, uint16_t cy, uint16_t r);
-
-
-void drawSolidCircle(uint8_t color, uint16_t cx, uint16_t cy, uint16_t r);
-
-
-void drawCharacter(unsigned char character, uint16_t x, uint16_t y, uint8_t color);
-
-
-void drawString(const char *string, uint16_t x, uint16_t y, uint8_t color);
-
-
-void drawCharset(void);
-
+void gfx_probe(void);
 
 #endif /* DRIVER_GRAPHICS_H_ */

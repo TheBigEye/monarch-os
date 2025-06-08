@@ -23,6 +23,7 @@ LD = i686-elf-ld
 
 # GCC compilation flags
 CCFLAGS := $(strip                  \
+    -pipe                           \
     -std=gnu99                      \
     -m32                            \
     -mfpmath=387                    \
@@ -35,6 +36,7 @@ CCFLAGS := $(strip                  \
     -finline-functions              \
     -fno-builtin                    \
     -ffreestanding                  \
+    -fno-strict-aliasing            \
     -Wl,--file-alignment,16         \
     -Wl,--section-alignment,4096    \
 )
@@ -63,6 +65,24 @@ LDFLAGS := $(strip                  \
     -Map=kernel.map                 \
 )
 
+# Detect OS and audio system
+OS_NAME := $(shell uname -s)
+# Default audio system
+AUDIO_SYSTEM := dsound
+
+ifeq ($(OS_NAME),Linux)
+    # Check for pipewire first, then alsa
+    HAVE_PIPEWIRE := $(shell which pw-top >/dev/null 2>&1 && echo 1 || echo 0)
+    ifeq ($(HAVE_PIPEWIRE),1)
+        AUDIO_SYSTEM := pipewire
+    else
+        HAVE_ALSA := $(shell which aplay >/dev/null 2>&1 && echo 1 || echo 0)
+        ifeq ($(HAVE_ALSA),1)
+            AUDIO_SYSTEM := alsa
+        endif
+    endif
+endif
+
 # Qemu virtual machine config
 QEMU_ARGS := $(strip                \
     -boot d                         \
@@ -72,7 +92,7 @@ QEMU_ARGS := $(strip                \
     -serial stdio                   \
     -display sdl,gl=off             \
     -device VGA,vgamem_mb=8         \
-    -audiodev dsound,id=0           \
+    -audiodev $(AUDIO_SYSTEM),id=0  \
     -machine pcspk-audiodev=0       \
     -machine pc                     \
     -rtc base=localtime,clock=host  \
@@ -93,6 +113,7 @@ SOURCES = $(wildcard                       \
 	$(SOURCE_DIR)/kernel/CPU/*.c           \
 	$(SOURCE_DIR)/kernel/drivers/ATA/*.c   \
 	$(SOURCE_DIR)/kernel/drivers/COM/*.c   \
+	$(SOURCE_DIR)/kernel/drivers/FBC/*.c   \
 	$(SOURCE_DIR)/kernel/drivers/TTY/*.c   \
 	$(SOURCE_DIR)/kernel/drivers/VGA/*.c   \
 	$(SOURCE_DIR)/kernel/drivers/*.c       \
@@ -103,6 +124,7 @@ SOURCES = $(wildcard                       \
 
 # C Headers files
 HEADERS = $(wildcard                       \
+	$(SOURCE_DIR)/boot/*.h                 \
 	$(SOURCE_DIR)/common/*.h               \
 	$(SOURCE_DIR)/kernel/BFS/*.h           \
 	$(SOURCE_DIR)/kernel/BGL/*.h           \
@@ -115,6 +137,7 @@ HEADERS = $(wildcard                       \
 	$(SOURCE_DIR)/kernel/CPU/*.h           \
 	$(SOURCE_DIR)/kernel/drivers/ATA/*.h   \
 	$(SOURCE_DIR)/kernel/drivers/COM/*.h   \
+	$(SOURCE_DIR)/kernel/drivers/FBC/*.h   \
 	$(SOURCE_DIR)/kernel/drivers/TTY/*.h   \
 	$(SOURCE_DIR)/kernel/drivers/VGA/*.h   \
 	$(SOURCE_DIR)/kernel/drivers/*.h       \
@@ -151,7 +174,8 @@ CHECK_PYTHON := $(shell command -v python 2>/dev/null)
 
 
 ### First rule is the one executed when no parameters are fed to the Makefile
-all: bitmaps kernel.elf run
+all: binaries kernel.elf run
+release: binaries kernel.elf OS.iso
 
 
 # We need python for bitmaps!
@@ -163,15 +187,21 @@ check-python:
 
 
 # Convert bitmaps into binary files :)
-bitmaps: check-python
-	@if [ "$(NEED_BITMAPS)" = "1" ]; then                           \
-		echo -e "${GREEN}[-]${RESET} Processing image assets...";   \
-		mkdir -p $(BINARIES_DIR);                                   \
-		python $(SCRIPTS_DIR)/imgbin.py "$(BITMAPS_DIR)" -v;     \
-		mv $(BITMAPS_DIR)/*.bin $(BINARIES_DIR)/;                   \
-		echo -e "${GREEN}[-]${RESET} Image processing complete";    \
-	else                                                            \
-		echo -e "${GREEN}[-]${RESET} Image assets are up to date";  \
+binaries: check-python
+	@if [ "$(NEED_BITMAPS)" = "1" ]; then                                               \
+		echo -e "${GREEN}[-]${RESET} Processing bitmaps...";                            \
+		mkdir -p $(BINARIES_DIR)/bitmaps;                                               \
+		python $(SCRIPTS_DIR)/imgbin.py "$(BITMAPS_DIR)" -o "$(BINARIES_DIR)/bitmaps";  \
+		echo -e "${GREEN}[-]${RESET} Processing strings...";                            \
+		for file in $(ASSETS_DIR)/*.txt; do                                             \
+			if [ -f "$$file" ]; then                                                    \
+				filename=$$(basename "$$file");                                         \
+				cp "$$file" "$(BINARIES_DIR)/$${filename%.txt}.bin";                    \
+			fi;                                                                         \
+		done;                                                                           \
+		echo -e "${GREEN}[-]${RESET} Binaries processing done";                         \
+	else                                                                                \
+		echo -e "${GREEN}[-]${RESET} Binaries are up to date!";                         \
 	fi
 
 
@@ -196,12 +226,14 @@ OS.iso: kernel.elf
 # Run the OS image in QEMU
 run: OS.iso
 	@echo -e "${GREEN}[-]${RESET} Starting QEMU virtual machine for '${BROWN}./$^${RESET}' ..."
+	@echo -e "${CYAN}[i]${RESET} Using audio backend: ${BROWN}$(AUDIO_SYSTEM)${RESET}"
 	@qemu-system-i386 -cdrom $< $(QEMU_ARGS)
 
 
 # Run the OS image in QEMU
 ata: OS.iso
 	@echo -e "${GREEN}[-]${RESET} Starting QEMU virtual machine for '${BROWN}./$^${RESET}' ..."
+	@echo -e "${CYAN}[i]${RESET} Using audio backend: ${BROWN}$(AUDIO_SYSTEM)${RESET}"
 	@qemu-system-i386 -cdrom $< $(QEMU_ARGS) -drive file=disk.img,index=0,if=ide,format=raw
 
 
@@ -238,5 +270,5 @@ clean:
 	@echo -e "${GREEN}[-]${RESET} Cleaning objects and output files ..."
 	@$(RM) *.o *.dis *.elf *.iso *.map
 	@$(RM) -rf ./grub/temp
-	@$(RM) -rf $(BINARIES_DIR)/*.bin
+	@$(RM) -rf $(BINARIES_DIR)/*
 	@find $(SOURCE_DIR) -name '*.o' -type f -delete

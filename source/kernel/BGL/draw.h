@@ -4,7 +4,7 @@
 #include "surface.h"
 
 // Maximum number of dirty rectangles to track
-#define MAX_DIRTY_RECTS 32
+#define MAX_DIRTY_RECTS 255
 
 // Dirty rectangle tracking structure
 typedef struct {

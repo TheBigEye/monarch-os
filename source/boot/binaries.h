@@ -3,7 +3,7 @@
 
 #define BMP_SIZE(x, y) (((x) * (y)) / 2)
 
-#include "../common/common.h"
+#include <stdint.h>
 
 /* The butterfly ascii logo */
 extern char butterfly_logo[];
