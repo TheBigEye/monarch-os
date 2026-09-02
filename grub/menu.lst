@@ -1,8 +1,0 @@
-default=0
-timeout=30
-
-color light-cyan/cyan black/light-gray
-
-title Monarch OS [Butterfly x86]
-    root (cd)
-    kernel /boot/kernel.elf --type multiboot

@@ -1,357 +1,289 @@
-#include "heap.h"
-#include "memory.h"
+#include "kernel/memory/heap.h"
+#include "arch/x86/paging.h"
+#include "kernel/memory/physical.h"
+#include "kernel/scheduler/spinlock.h"
 
-#include "../modules/terminal.h"
-#include "../bugfault.h"
+#define MAGIC 0x4D484541u /* MHEA */
 
-// Magic sentinel value to detect heap corruption
-#define HEAP_MAGIC        0xC0DEFACE
-#define BLOCK_FREE        0
-#define BLOCK_ALLOCATED   1
-#define ALIGNMENT_PADDING 4
+typedef struct block block;
+struct block {
+    uint32_t magic;
+    uint32_t free;
+    size_t size;
+    block *next;
+};
 
+static struct heap global;
+static block *head;
 
-// Memory layout statistics
-static uint32_t last_alloc = 0;         // Points to the next allocation position
-static uint32_t heap_end = 0;           // End of heap area
-static uint32_t heap_begin = 0;         // Beginning of heap area
-static uint32_t pheap_begin = 0;        // Start of page-aligned heap
-static uint32_t pheap_end = 0;          // End of page-aligned heap
-static uint8_t *pheap_desc = 0;         // Page allocation bitmap
-static uint32_t memory_used = 0;        // Total memory in use
-static uint32_t total_allocations = 0;  // Number of successful allocations
-static uint32_t total_frees = 0;        // Number of successful frees
+/*
+ * The free-list (head) and the block metadata it links are shared mutable
+ * state. Nothing here yields mid-operation today (no driver IRQ handler
+ * calls kmalloc/kfree, and soft-preemption only switches threads at explicit
+ * schedpoll()/yield() points), so this guard is currently uncontended in
+ * practice. It exists so this stays true by construction rather than by
+ * convention alone: any future caller from interrupt context, or a move to real
+ * preemption/SMP, is protected instead of silently corrupting the heap.
+ */
+static struct spinlock guard;
 
+static size_t align(size_t size) {
+    return (size + 7u) & ~7u;
+}
 
-// Internal validation routine to check heap block integrity
-static int validateBlock(alloc_t *block) {
-    if (!block) return 0;
+static int commit(struct heap *self, uintptr_t end) {
+    uintptr_t target;
 
-    // Check if block is within heap bounds
-    if ((uint32_t)block < heap_begin || (uint32_t)block >= heap_end) {
+    if (!self->_paged) {
+        return end <= self->_end;
+    }
+
+    if (end > self->_end) {
         return 0;
     }
 
-    // Check magic number for corruption
-    if (block->magic != HEAP_MAGIC) {
+    target = alignup(end, PAGE_SIZE);
+    while (self->_mapped < target) {
+        uintptr_t physical = pmmalloc();
+        if (!physical) {
+            return 0;
+        }
+        if (!pagemap(self->_mapped, physical, PAGE_WRITE)) {
+            pmmfree(physical);
+            return 0;
+        }
+        memset((void *)self->_mapped, 0, PAGE_SIZE);
+        self->_mapped += PAGE_SIZE;
+    }
+
+    return 1;
+}
+
+static void initraw(struct heap *self, uintptr_t start, uintptr_t end, uintptr_t mapped, int paged) {
+    self->_start = alignup(start, 16);
+    self->_end = end;
+    self->_break = self->_start;
+    self->_mapped = mapped;
+    self->_used = 0;
+    self->_paged = paged;
+    head = nil;
+    spinlock(&guard);
+}
+
+static void init(struct heap *self, uintptr_t start, uintptr_t end) {
+    memset(self, 0, sizeof(*self));
+    heap(self);
+    initraw(self, start, end, end, 0);
+}
+
+static void split(block *b, size_t size) {
+    block *n;
+    if (b->size < size + sizeof(block) + 16) {
+        return;
+    }
+    n = (block *)((uint8_t *)(b + 1) + size);
+    n->magic = MAGIC;
+    n->free = 1;
+    n->size = b->size - size - sizeof(block);
+    n->next = b->next;
+    b->size = size;
+    b->next = n;
+}
+
+static void merge(void) {
+    block *b = head;
+    while (b && b->next) {
+        if (b->free && b->next->free) {
+            b->size += sizeof(block) + b->next->size;
+            b->next = b->next->next;
+        } else {
+            b = b->next;
+        }
+    }
+}
+
+static void *alloc(struct heap *self, size_t size) {
+    block *b;
+    block *last = nil;
+    uintptr_t needed;
+    void *result = nil;
+
+    if (!size) {
+        return nil;
+    }
+
+    size = align(size);
+
+    guard.lock(&guard);
+
+    for (b = head; b; b = b->next) {
+        if (b->free && b->size >= size) {
+            split(b, size);
+            b->free = 0;
+            self->_used += b->size;
+            result = b + 1;
+            goto done;
+        }
+        last = b;
+    }
+
+    needed = self->_break + sizeof(block) + size;
+    if (!commit(self, needed)) {
+        goto done;
+    }
+
+    b = (block *)self->_break;
+    b->magic = MAGIC;
+    b->free = 0;
+    b->size = size;
+    b->next = nil;
+    self->_break = needed;
+    self->_used += size;
+
+    if (last) {
+        last->next = b;
+    } else {
+        head = b;
+    }
+
+    result = b + 1;
+
+done:
+    guard.unlock(&guard);
+    return result;
+}
+
+static void *calloc_impl(struct heap *self, size_t count, size_t size) {
+    size_t total = count * size;
+    void *ptr;
+
+    if (size && total / size != count) {
+        return nil;
+    }
+
+    ptr = self->alloc(self, total);
+    if (ptr) {
+        memset(ptr, 0, total);
+    }
+    return ptr;
+}
+
+static void free_impl(struct heap *self, void *ptr) {
+    block *b;
+    if (!ptr) {
+        return;
+    }
+
+    guard.lock(&guard);
+
+    b = ((block *)ptr) - 1;
+    if (b->magic != MAGIC || b->free) {
+        guard.unlock(&guard);
+        return;
+    }
+
+    b->free = 1;
+    if (self->_used >= b->size) {
+        self->_used -= b->size;
+    }
+    merge();
+
+    guard.unlock(&guard);
+}
+
+static size_t used(struct heap *self) {
+    return self->_used;
+}
+
+static size_t freebytes(struct heap *self) {
+    uintptr_t hard_free = self->_end > self->_break ? self->_end - self->_break : 0;
+    size_t reusable = 0;
+
+    guard.lock(&guard);
+    for (block *b = head; b; b = b->next) {
+        if (b->free) {
+            reusable += b->size;
+        }
+    }
+    guard.unlock(&guard);
+
+    return (size_t)hard_free + reusable;
+}
+
+void heap(struct heap *self) {
+    memset(self, 0, sizeof(*self));
+    self->init = init;
+    self->alloc = alloc;
+    self->calloc = calloc_impl;
+    self->free = free_impl;
+    self->used = used;
+    self->freebytes = freebytes;
+}
+
+void kheap(uintptr_t start, uintptr_t end) {
+    heap(&global);
+    global.init(&global, start, end);
+}
+
+int kheapvirtual(uintptr_t start, size_t reserve, size_t initial) {
+    uintptr_t end = start + reserve;
+    uintptr_t mapped = start;
+
+    heap(&global);
+    initraw(&global, start, end, mapped, 1);
+
+    if (!commit(&global, start + initial)) {
         return 0;
     }
 
     return 1;
 }
 
-
-// Internal defragmentation to coalesce adjacent free blocks
-static void defragmentHeap(void) {
-    uint8_t *current = (uint8_t *)heap_begin;
-
-    while ((uint32_t)current < last_alloc) {
-        alloc_t *block = (alloc_t *)current;
-
-        // Skip if not a valid block or is in use
-        if (!validateBlock(block) || block->status == BLOCK_ALLOCATED) {
-            current += block->size + sizeof(alloc_t) + ALIGNMENT_PADDING;
-            continue;
-        }
-
-        // Try to merge with next block if it's free
-        uint8_t *next_ptr = current + block->size + sizeof(alloc_t) + ALIGNMENT_PADDING;
-        if ((uint32_t)next_ptr < last_alloc) {
-            alloc_t *next_block = (alloc_t *) next_ptr;
-
-            if (validateBlock(next_block) && next_block->status == BLOCK_FREE) {
-                // Merge the blocks by increasing size and skipping the next header
-                block->size += next_block->size + sizeof(alloc_t) + ALIGNMENT_PADDING;
-
-                // Mark the merged block as invalid
-                next_block->magic = 0;
-
-                // Stay at current position to potentially merge more blocks
-                continue;
-            }
-        }
-
-        // Move to the next block
-        current += block->size + sizeof(alloc_t) + ALIGNMENT_PADDING;
-    }
+void *kmalloc(size_t size) {
+    return global.alloc(&global, size);
 }
 
-
-void initializeMemory(uint32_t kernel_end) {
-    // Validate kernel_end
-    if (kernel_end == 0) {
-        fprintf(serial, "[ERROR] Invalid 'kernel_end' value 0!\n");
-        THROW("Invalid 'kernel_end' value!");
-    }
-
-    // Initialize heap area - aligned to 4KB after the kernel
-    last_alloc = kernel_end + 0x1000;
-    heap_begin = last_alloc;
-
-    // Set page-aligned heap at 16MB mark
-    pheap_end = 0x1000000;  // 16MB
-    pheap_begin = pheap_end - (MAX_PAGE_ALIGNED_ALLOCS * 4096);
-    heap_end = pheap_begin;
-
-    // Zero out heap memory
-    memorySet((char *) heap_begin, 0, heap_end - heap_begin);
-
-    // Allocate a block for page allocation bitmap
-    pheap_desc = (uint8_t *) memoryAllocateBlock(MAX_PAGE_ALIGNED_ALLOCS);
-    if (!pheap_desc) {
-        fprintf(serial, "[ERROR] Failed to allocate page descriptor array!\n");
-        THROW("Failed to initialize page heap descriptor!");
-    }
-
-    // Zero out page allocation bitmap
-    memorySet(pheap_desc, 0, MAX_PAGE_ALIGNED_ALLOCS);
-
-    // Initialize statistics
-    memory_used = 0;
-    total_allocations = 0;
-    total_frees = 0;
-
-    fprintf(serial, "[i] Kernel heap initialized at %#X (%d bytes available)\n\n", last_alloc, heap_end - heap_begin);
+void *kcalloc(size_t count, size_t size) {
+    return global.calloc(&global, count, size);
 }
 
-
-void memoryGetStatus(void) {
-    printl(INFO, "Memory Heap Status:\n");
-
-    printf(" * Total alloc: %d\n", total_allocations);
-    printf(" * Total frees: %d\n\n", total_frees);
-
-    printf(" * Memory used: %d bytes\n", memory_used);
-    printf(" * Memory free: %d bytes\n\n", heap_end - heap_begin - memory_used);
-
-    printf(" * Memory-Heap size: %d bytes\n", heap_end - heap_begin);
-    printf(" * Memory-Heap head: %#X\n", heap_begin);
-    printf(" * Memory-Heap tail: %#X\n\n", heap_end);
-
-    printf(" * Paging-Heap size: %d bytes\n", pheap_end - pheap_begin);
-    printf(" * Paging-Heap head: %#X\n", pheap_begin);
-    printf(" * Paging-Heap tail: %#X\n\n", pheap_end);
+void kfree(void *ptr) {
+    global.free(&global, ptr);
 }
 
-
-void memoryFreeBlock(void *mem) {
-    // Validate pointer
-    if (mem == NULL) {
-        fprintf(serial, "[ERROR] Attempting to free NULL pointer-block!\n");
-        return;
-    }
-
-    // Calculate header location
-    alloc_t *alloc = ((alloc_t *)((uint8_t *) mem - sizeof(alloc_t)));
-
-    // Validate the block
-    if (!validateBlock(alloc)) {
-        fprintf(serial, "[ERROR] Attempting to free invalid or corrupted block at %#X!\n", (uint32_t) mem);
-        return;
-    }
-
-    // Check if block is already freed
-    if (alloc->status == BLOCK_FREE) {
-        fprintf(serial, "[ERROR] Double-free detected at %#X!\n", (uint32_t) mem);
-        return;
-    }
-
-    // Bounds check the size
-    if (alloc->size + sizeof(alloc_t) > memory_used) {
-        fprintf(serial, "[ERROR] Attempting to free more memory [%d bytes] than allocated [%d bytes]\n", alloc->size + sizeof(alloc_t), memory_used);
-        return;
-    }
-
-    // Mark block as free and update statistics
-    memory_used -= (alloc->size + sizeof(alloc_t) + ALIGNMENT_PADDING);
-    alloc->status = BLOCK_FREE;
-    total_frees++;
-
-    // Zero out memory to prevent information leaks and aid debugging
-    memorySet((uint8_t*) mem, 0, alloc->size);
-
-    // Periodically defragment the heap (every 10 frees)
-    if (total_frees % 10 == 0) {
-        defragmentHeap();
-    }
-
-    // fprintf(serial, "[DEBUG] Freed %d bytes at %#X\n", alloc->size, (uint32_t)mem);
+size_t kused(void) {
+    return global.used(&global);
 }
 
-
-void memoryFreePages(void *mem) {
-    // Validate pointer
-    if (mem == NULL) {
-        fprintf(serial, "[ERROR] Attempting to free NULL pointer-page!\n");
-        return;
-    }
-
-    // Validate address bounds
-    if ((uint32_t) mem < pheap_begin || (uint32_t) mem >= pheap_end) {
-        fprintf(serial, "[ERROR] Memory address %#X out of paging heap range! (%#X-%#X)\n", (uint32_t) mem, pheap_begin, pheap_end);
-        return;
-    }
-
-    // Determine which page is it
-    uint32_t pageIndex = ((uint32_t)mem - pheap_begin) / 4096;
-
-    // Validate page index
-    if (pageIndex >= MAX_PAGE_ALIGNED_ALLOCS) {
-        fprintf(serial, "[ERROR] Page index %d out of range (0-%d)!\n", pageIndex, MAX_PAGE_ALIGNED_ALLOCS - 1);
-        return;
-    }
-
-    // Check if page is already freed
-    if (pheap_desc[pageIndex] == 0) {
-        fprintf(serial, "[ERROR] Double-free of page at %#X (index %d)!\n", (uint32_t) mem, pageIndex);
-        return;
-    }
-
-    // Free the page
-    pheap_desc[pageIndex] = 0;
-    // fprintf(serial, "[DEBUG] Page %d freed at %#X\n", pageIndex, (uint32_t)mem);
-
-    // Zero out the page memory
-    memorySet(mem, 0, 4096);
+size_t kfreebytes(void) {
+    return global.freebytes(&global);
 }
 
-
-char* memoryAllocatePages(uint32_t size) {
-    // Validate size
-    if (size == 0) {
-        fprintf(serial, "[ERROR] Attempting to allocate 0 pages!\n");
-        return NULL;
-    }
-
-    // Find consecutive free pages
-    uint32_t consecutiveFree = 0;
-    uint32_t startPage = 0;
-
-    for (uint32_t i = 0; i < MAX_PAGE_ALIGNED_ALLOCS; i++) {
-        if (pheap_desc[i] == 0) {
-            if (consecutiveFree == 0) {
-                startPage = i;
-            }
-            consecutiveFree++;
-
-            if (consecutiveFree >= size) {
-                // Found enough consecutive pages
-                for (uint32_t j = startPage; j < startPage + size; j++) {
-                    pheap_desc[j] = 1;
-                }
-
-                void *allocatedMemory = (void*)(pheap_begin + startPage * 4096);
-
-                // Zero out the memory
-                memorySet(allocatedMemory, 0, size * 4096);
-
-                //fprintf(serial, "[DEBUG] Allocated %d pages from %#X to %#X\n", size, (uint32_t)allocatedMemory, (uint32_t)allocatedMemory + (size * 4096) - 1);
-
-                return allocatedMemory;
-            }
-        } else {
-            // Reset counter when we hit an allocated page
-            consecutiveFree = 0;
-        }
-    }
-
-    fprintf(serial, "[ERROR] Failed to allocate %d pages - not enough consecutive free pages!\n", size);
-    return NULL;
+uintptr_t kheapstart(void) {
+    return global._start;
 }
 
+uintptr_t kheapend(void) {
+    return global._end;
+}
 
-char* memoryAllocateBlock(uint32_t size) {
-    // Validate size
-    if (size == 0) {
-        fprintf(serial, "[ERROR] Attempting to allocate a block of size 0!\n");
-        return NULL;
+uintptr_t kheapbreak(void) {
+    return global._break;
+}
+
+uintptr_t kheapmapped(void) {
+    return global._mapped;
+}
+
+int kheappaged(void) {
+    return global._paged;
+}
+
+char *kstrdup(const char *text) {
+    size_t size = strlen(text) + 1;
+    char *copy = kmalloc(size);
+    if (copy) {
+        memcpy(copy, text, size);
     }
-
-    // First attempt: search for a suitable free block
-    uint8_t *mem = (uint8_t *) heap_begin;
-
-    while ((uint32_t) mem < last_alloc) {
-        alloc_t *block = (alloc_t *)mem;
-
-        // If the block has no size, we've reached the end of allocation
-        if (!validateBlock(block) || block->size == 0) {
-            break;
-        }
-
-        // If the block is allocated, skip it
-        if (block->status == BLOCK_ALLOCATED) {
-            mem += block->size + sizeof(alloc_t) + ALIGNMENT_PADDING;
-            continue;
-        }
-
-        // Found a free block, check if it's large enough
-        if (block->size >= size) {
-            // Check if we should split this block
-            if (block->size >= size + sizeof(alloc_t) + ALIGNMENT_PADDING + 64) {  // 64 byte minimum for split block
-                // Calculate the size of the remaining free block
-                uint32_t remaining_size = block->size - size - sizeof(alloc_t) - ALIGNMENT_PADDING;
-
-                // Create a new header for the split block
-                alloc_t *split_block = (alloc_t *)(mem + sizeof(alloc_t) + size + ALIGNMENT_PADDING);
-                split_block->magic = HEAP_MAGIC;
-                split_block->status = BLOCK_FREE;
-                split_block->size = remaining_size;
-
-                // Adjust the size of the original block
-                block->size = size;
-            }
-
-            // Mark the block as allocated
-            block->status = BLOCK_ALLOCATED;
-            block->magic = HEAP_MAGIC;
-
-            // Update statistics
-            memory_used += (block->size + sizeof(alloc_t) + ALIGNMENT_PADDING);
-            total_allocations++;
-
-            // Zero out the block for security
-            memorySet(mem + sizeof(alloc_t), 0, size);
-
-            //fprintf(serial, "[DEBUG] Re-allocated %d bytes at %#X\n", size, (uint32_t)(mem + sizeof(alloc_t)));
-
-            return (char *)(mem + sizeof(alloc_t));
-        }
-
-        // Move to the next block
-        mem += block->size + sizeof(alloc_t) + ALIGNMENT_PADDING;
-    }
-
-    // Second attempt: allocate a new block at the end of the heap
-
-    // Check if we have enough space
-    if ((last_alloc + size + sizeof(alloc_t) + ALIGNMENT_PADDING) >= heap_end) {
-        fprintf(serial, "[ERROR] Out of memory: Cannot allocate %d bytes! (heap_end: %#X, last_alloc: %#X)\n", size, heap_end, last_alloc);
-        return NULL;
-    }
-
-    // Set up the new block header
-    alloc_t *new_block = (alloc_t *) last_alloc;
-    new_block->magic = HEAP_MAGIC;
-    new_block->status = BLOCK_ALLOCATED;
-    new_block->size = size;
-
-    // Calculate new allocation position
-    uint32_t new_last_alloc = last_alloc + size + sizeof(alloc_t) + ALIGNMENT_PADDING;
-
-    // Update allocation statistics
-    memory_used += (size + sizeof(alloc_t) + ALIGNMENT_PADDING);
-    total_allocations++;
-
-    // Zero out the memory for security
-    memorySet((char *)(last_alloc + sizeof(alloc_t)), 0, size);
-
-    // Return the pointer to the allocated memory
-    void *result = (void *)(last_alloc + sizeof(alloc_t));
-
-    // Update the last allocation pointer
-    last_alloc = new_last_alloc;
-
-    //fprintf(serial, "[DEBUG] Allocated new %d bytes at %#X (ends at %#X)\n", size, (uint32_t)result, last_alloc);
-
-    return (char *)result;
+    return copy;
 }

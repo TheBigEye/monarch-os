@@ -1,8 +1,0 @@
-.vscode/settings.json
-*.o
-*.img
-*.iso
-*.elf
-doc/*.txt
-doc/*.pdf
-doc/*.docx

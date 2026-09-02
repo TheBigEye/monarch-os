@@ -1,0 +1,2 @@
+#!/bin/bush
+echo Hello from the generated initrd archive.

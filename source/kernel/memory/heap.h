@@ -1,63 +1,37 @@
-#ifndef _KERNEL_HEAP_H
-#define _KERNEL_HEAP_H 1
+#ifndef MONARCH_KERNEL_MEMORY_HEAP_H
+#define MONARCH_KERNEL_MEMORY_HEAP_H 1
 
-#include "../../common/common.h"
+#include "base/api/monarch.h"
 
-#define MAX_PAGE_ALIGNED_ALLOCS 32
+struct heap {
+    void (*init)(struct heap *self, uintptr_t start, uintptr_t end);
+    void *(*alloc)(struct heap *self, size_t size);
+    void *(*calloc)(struct heap *self, size_t count, size_t size);
+    void (*free)(struct heap *self, void *ptr);
+    size_t (*used)(struct heap *self);
+    size_t (*freebytes)(struct heap *self);
 
-typedef struct {
-    uint32_t magic;   // Magic number to detect corruption
-    uint8_t status;   // 0 = free, 1 = allocated
-    uint32_t size;    // Size of the data portion (not including this header)
-} alloc_t;
+    uintptr_t _start;
+    uintptr_t _end;
+    uintptr_t _break;
+    uintptr_t _mapped;
+    size_t _used;
+    int _paged;
+};
 
+void heap(struct heap *self);
+void kheap(uintptr_t start, uintptr_t end);
+int kheapvirtual(uintptr_t start, size_t reserve, size_t initial);
+void *kmalloc(size_t size);
+void *kcalloc(size_t count, size_t size);
+void kfree(void *ptr);
+size_t kused(void);
+size_t kfreebytes(void);
+uintptr_t kheapstart(void);
+uintptr_t kheapend(void);
+uintptr_t kheapbreak(void);
+uintptr_t kheapmapped(void);
+int kheappaged(void);
+char *kstrdup(const char *text);
 
-/**
- * Initialize the memory subsystem
- *
- * @param kernel_end Physical address where the kernel ends
- */
-void initializeMemory(uint32_t kernel_end);
-
-
-/**
- * Display memory allocation statistics
- */
-void memoryGetStatus(void);
-
-
-/**
- * Allocate page-aligned memory
- *
- * @param size Number of pages to allocate (each page is 4096 bytes)
- * @return Pointer to the allocated memory, or NULL on failure
- */
-char* memoryAllocatePages(uint32_t size);
-
-
-/**
- * Allocate a block of memory
- *
- * @param size Number of bytes to allocate
- * @return Pointer to the allocated memory, or NULL on failure
- */
-char* memoryAllocateBlock(uint32_t size);
-
-
-/**
- * Free a block of memory previously allocated with memoryAllocateBlock
- *
- * @param mem Pointer to the memory block to free
- */
-void memoryFreeBlock(void *mem);
-
-
-/**
- * Free page-aligned memory previously allocated with memoryAllocatePages
- *
- * @param mem Pointer to the page-aligned memory to free
- */
-void memoryFreePages(void *mem);
-
-
-#endif /* _KERNEL_HEAP_H */
+#endif /* MONARCH_KERNEL_MEMORY_HEAP_H */

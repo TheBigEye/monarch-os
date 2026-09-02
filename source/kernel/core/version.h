@@ -1,0 +1,11 @@
+#ifndef MONARCH_KERNEL_CORE_VERSION_H
+#define MONARCH_KERNEL_CORE_VERSION_H 1
+
+#define MONARCH_NAME "Monarch OS"
+#define MONARCH_KERNEL "monarch"
+#define MONARCH_VERSION "0.1.0"
+#define MONARCH_CODENAME "bluewings"
+#define MONARCH_ARCH "i686"
+#define MONARCH_COPYRIGHT "2026"
+
+#endif /* MONARCH_KERNEL_CORE_VERSION_H */

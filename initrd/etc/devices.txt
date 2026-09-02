@@ -1,0 +1,6 @@
+/dev/console  - VGA text console
+/dev/serial   - COM1 serial output
+/dev/keyboard - keyboard character input
+/dev/null     - sink / eof
+/dev/zero     - zero byte stream
+/dev/ram0     - initrd ramdisk block device
