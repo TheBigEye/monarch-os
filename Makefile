@@ -270,6 +270,11 @@ APP_WIN_C := $(shell find $(APP_DIR)/win -maxdepth 1 -name '*.c' 2>/dev/null | s
 
 APP_ASM_BINS := $(patsubst $(APP_DIR)/%.asm,$(INITRD_DIR)/bin/%.elf,$(APP_ASM))
 APP_C_BINS := $(patsubst $(APP_DIR)/bin/%.c,$(INITRD_DIR)/bin/%.elf,$(APP_C))
+APP_WING_MODULE_OBJS := $(patsubst $(APP_DIR)/sys/%.c,$(BUILD_DIR)/apps/sys/%.o,$(shell find $(APP_DIR)/sys/wing -maxdepth 1 -name '*.c' 2>/dev/null | sort))
+APP_DESK_MODULE_OBJS := $(patsubst $(APP_DIR)/sys/%.c,$(BUILD_DIR)/apps/sys/%.o,$(shell find $(APP_DIR)/sys/desk -maxdepth 1 -name '*.c' 2>/dev/null | sort))
+APP_SPARK_MODULE_OBJS := $(patsubst $(APP_DIR)/sys/%.c,$(BUILD_DIR)/apps/sys/%.o,$(shell find $(APP_DIR)/sys/spark -maxdepth 1 -name '*.c' 2>/dev/null | sort))
+APP_WUSH_MODULE_OBJS := $(patsubst $(APP_DIR)/win/%.c,$(BUILD_DIR)/apps/win/%.o,$(shell find $(APP_DIR)/win/wush -maxdepth 1 -name '*.c' 2>/dev/null | sort))
+APP_WASP_MODULE_OBJS := $(patsubst $(APP_DIR)/win/%.c,$(BUILD_DIR)/apps/win/%.o,$(shell find $(APP_DIR)/win/wasp -maxdepth 1 -name '*.c' 2>/dev/null | sort))
 APP_SYS_BINS := $(INITRD_DIR)/sys/bin/wing.elf $(INITRD_DIR)/sys/bin/spark.elf $(INITRD_DIR)/sys/bin/desk.elf
 APP_WIN_BINS := $(INITRD_DIR)/win/bin/wasp.elf $(INITRD_DIR)/win/bin/wush.elf
 APP_BINS := $(APP_ASM_BINS) $(APP_C_BINS) $(APP_SYS_BINS) $(APP_WIN_BINS)
@@ -642,10 +647,35 @@ $(INITRD_DIR)/bin/%.elf: $(BUILD_DIR)/apps/bin/%.o $(APP_CRT0_OBJ) $(APP_GFX_ALL
 	@printf "$(CYAN)[i]$(RESET) ULD $(BROWN)%s$(RESET)\n" "$@"
 	@$(LD) $(APP_LDFLAGS) $(APP_CRT0_OBJ) $(APP_GFX_ALLOC_OBJ) $< --start-group $(APP_RUNTIME_ARCHIVES) --end-group -o $@
 
+$(INITRD_DIR)/sys/bin/wing.elf: $(APP_WING_MODULE_OBJS) $(APP_CRT0_OBJ) $(APP_GFX_ALLOC_OBJ) $(APP_RUNTIME_ARCHIVES) Makefile
+	@mkdir -p $(dir $@)
+	@printf "$(CYAN)[i]$(RESET) ULD $(BROWN)%s$(RESET)\n" "$@"
+	@$(LD) $(APP_LDFLAGS) $(APP_CRT0_OBJ) $(APP_GFX_ALLOC_OBJ) $(APP_WING_MODULE_OBJS) --start-group $(APP_RUNTIME_ARCHIVES) --end-group -o $@
+
+$(INITRD_DIR)/sys/bin/desk.elf: $(APP_DESK_MODULE_OBJS) $(APP_CRT0_OBJ) $(APP_GFX_ALLOC_OBJ) $(APP_RUNTIME_ARCHIVES) Makefile
+	@mkdir -p $(dir $@)
+	@printf "$(CYAN)[i]$(RESET) ULD $(BROWN)%s$(RESET)\n" "$@"
+	@$(LD) $(APP_LDFLAGS) $(APP_CRT0_OBJ) $(APP_GFX_ALLOC_OBJ) $(APP_DESK_MODULE_OBJS) --start-group $(APP_RUNTIME_ARCHIVES) --end-group -o $@
+
+$(INITRD_DIR)/sys/bin/spark.elf: $(APP_SPARK_MODULE_OBJS) $(APP_CRT0_OBJ) $(APP_GFX_ALLOC_OBJ) $(APP_RUNTIME_ARCHIVES) Makefile
+	@mkdir -p $(dir $@)
+	@printf "$(CYAN)[i]$(RESET) ULD $(BROWN)%s$(RESET)\n" "$@"
+	@$(LD) $(APP_LDFLAGS) $(APP_CRT0_OBJ) $(APP_GFX_ALLOC_OBJ) $(APP_SPARK_MODULE_OBJS) --start-group $(APP_RUNTIME_ARCHIVES) --end-group -o $@
+
 $(INITRD_DIR)/sys/bin/%.elf: $(BUILD_DIR)/apps/sys/%.o $(APP_CRT0_OBJ) $(APP_GFX_ALLOC_OBJ) $(APP_RUNTIME_ARCHIVES) Makefile
 	@mkdir -p $(dir $@)
 	@printf "$(CYAN)[i]$(RESET) ULD $(BROWN)%s$(RESET)\n" "$@"
 	@$(LD) $(APP_LDFLAGS) $(APP_CRT0_OBJ) $(APP_GFX_ALLOC_OBJ) $< --start-group $(APP_RUNTIME_ARCHIVES) --end-group -o $@
+
+$(INITRD_DIR)/win/bin/wush.elf: $(APP_WUSH_MODULE_OBJS) $(APP_CRT0_OBJ) $(APP_RUNTIME_ARCHIVES) Makefile
+	@mkdir -p $(dir $@)
+	@printf "$(CYAN)[i]$(RESET) ULD $(BROWN)%s$(RESET)\n" "$@"
+	@$(LD) $(APP_LDFLAGS) $(APP_CRT0_OBJ) $(APP_WUSH_MODULE_OBJS) --start-group $(APP_RUNTIME_ARCHIVES) --end-group -o $@
+
+$(INITRD_DIR)/win/bin/wasp.elf: $(APP_WASP_MODULE_OBJS) $(APP_CRT0_OBJ) $(APP_RUNTIME_ARCHIVES) Makefile
+	@mkdir -p $(dir $@)
+	@printf "$(CYAN)[i]$(RESET) ULD $(BROWN)%s$(RESET)\n" "$@"
+	@$(LD) $(APP_LDFLAGS) $(APP_CRT0_OBJ) $(APP_WASP_MODULE_OBJS) --start-group $(APP_RUNTIME_ARCHIVES) --end-group -o $@
 
 $(INITRD_DIR)/win/bin/%.elf: $(BUILD_DIR)/apps/win/%.o $(APP_CRT0_OBJ) $(APP_RUNTIME_ARCHIVES) Makefile
 	@mkdir -p $(dir $@)

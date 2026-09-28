@@ -8,6 +8,7 @@
 #include "base/usr/sys.h"
 #include "base/win/protocol.h"
 #include "base/win/window.h"
+#include "wasp.h"
 
 static void trace(const char *text) { int fd=(int)open("/dev/serial", OWRITE); if(fd>=0){write(fd,text,strlen(text));close(fd);} }
 
@@ -35,19 +36,22 @@ static int command(WinChannel *channel, uint32_t request, uint32_t opcode,
     ready.fd = channel->fd;
     ready.events = POLLIN;
     ready.revents = 0;
-    if (poll(&ready, 1, 1000) != 1 || !(ready.revents & POLLIN)) { trace("WASP command poll fail\n"); return 0; }
-    if (!channel->recv(channel, &reply) || reply.opcode != WIN_ACK ||
-        reply.request != request) {
-        int serial = (int)open("/dev/serial", OWRITE);
-        if (serial >= 0) {
-            char info[32];
-            snprintf(info, sizeof(info), "WASP ack op=%u req=%u want=%u\n", reply.opcode, reply.request, request);
-            write(serial, info, strlen(info)); close(serial);
+    for (;;) {
+        ready.revents = 0;
+        if (poll(&ready, 1, 1000) != 1 || !(ready.revents & POLLIN)) {
+            trace("WASP command poll fail\n");
+            return 0;
         }
-        return 0;
+        if (!channel->recv(channel, &reply)) return 0;
+        if (reply.opcode == WIN_ACK && reply.request == request) {
+            if (reply_handle) *reply_handle = reply.handle;
+            return 1;
+        }
+        if (reply.opcode == WIN_ERROR && reply.request == request) return 0;
+        /* Wing may queue an asynchronous event between a request and its
+           acknowledgement. It is not a protocol failure; the event loop will
+           consume interaction events after setup. */
     }
-    if (reply_handle) *reply_handle = reply.handle;
-    return 1;
 }
 
 static int events(WinChannel *channel, uint32_t parent) {
@@ -66,7 +70,7 @@ static int events(WinChannel *channel, uint32_t parent) {
     }
 }
 
-int main(int argc, char **argv) {
+int Wasp_run(int argc, char **argv) {
     WinChannel channel;
     WinMessage hello;
     WinMessage hello_ack;

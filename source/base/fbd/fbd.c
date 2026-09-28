@@ -101,6 +101,9 @@ int fbd_open(struct fbd *fb) {
     if (fb->fd < 0) {
         return 0;
     }
+    /* The framebuffer is a private service resource. A client launched by
+       Wing must not retain it after the compositor exits. */
+    fcntl(fb->fd, F_SETFD, FD_CLOEXEC);
 
     return 1;
 }

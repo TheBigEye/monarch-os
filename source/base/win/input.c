@@ -23,6 +23,8 @@ static int input_open(struct Input *input) {
     if (!input) return 0;
     input->keyboard = (int)open("/dev/keyboard", OREAD);
     input->mouse = (int)open("/dev/mouse", OREAD);
+    if (input->keyboard >= 0) fcntl(input->keyboard, F_SETFD, FD_CLOEXEC);
+    if (input->mouse >= 0) fcntl(input->mouse, F_SETFD, FD_CLOEXEC);
     return input->keyboard >= 0 || input->mouse >= 0;
 }
 static void input_close(struct Input *input) {

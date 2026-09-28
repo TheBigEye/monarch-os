@@ -33,6 +33,8 @@
 /** Number of elements in a compile-time array. Do not use this on pointers. */
 #define countof(a) (sizeof(a) / sizeof((a)[0]))
 
+#define private static
+
 /**
  * Round an integer address/value upward to the next alignment boundary.
  * `align` must be a power of two, for example 4, 16, or PAGE_SIZE.

@@ -5,6 +5,7 @@
 #include "kernel/fs/pty.h"
 #include "kernel/memory/heap.h"
 #include "kernel/scheduler/thread.h"
+#include "kernel/core/debug.h"
 
 #define PTY_BUFFER 4096u
 #define PTY_LINE 256u
@@ -159,8 +160,14 @@ static void retain_pty(struct vfile *file) { if (file) file->_refs++; }
 static void close_pty(struct vfile *file) {
     struct pty_end *end = endof(file);
     if (!end) return;
-    if (file->_refs > 1) { file->_refs--; return; }
+    if (file->_refs > 1) {
+        file->_refs--;
+        KLOG("pty", "drop %s refs=%u", end->master ? "master" : "slave", (unsigned)file->_refs);
+        return;
+    }
     if (end->master) end->state->master = nil; else end->state->slave = nil;
+    KLOG("pty", "close %s master=%p slave=%p", end->master ? "master" : "slave",
+         (void *)end->state->master, (void *)end->state->slave);
     if (file->_path) kfree(file->_path);
     if (!end->state->master && !end->state->slave) {
         end->state->used = 0;
