@@ -71,6 +71,8 @@ static int read_pty(struct vfile *file, char *buffer, size_t size) {
     size_t done = 0;
     if (!state || !buffer) return -1;
     while (done < size) {
+        if (end->master && !state->slave)
+            return done ? (int)done : 0;
         int ok = end->master ? pop(state->output, &state->output_read,
                                    &state->output_used, &value)
                              : pop(state->input, &state->input_read,
@@ -96,6 +98,8 @@ static int write_pty(struct vfile *file, const char *buffer, size_t size) {
     if (!state || (!buffer && size)) return -1;
     while (done < size) {
         uint8_t value = (uint8_t)buffer[done];
+        if (end->master && !state->slave)
+            return done ? (int)done : -EIO;
         if (end->master) {
             if ((state->termios.lflag & TERMIOS_ICANON) && value == 0x04u) {
                 if (state->line_used) flush_line(state);
@@ -140,7 +144,8 @@ static uint32_t ready_pty(struct vfile *file, uint32_t events) {
     uint32_t ready = 0;
     if (!state) return POLLERR | POLLHUP;
     if (end->master) {
-        if ((events & POLLIN) && state->output_used) ready |= POLLIN;
+        if (!state->slave) ready |= POLLHUP | POLLERR;
+        if ((events & POLLIN) && (state->output_used || !state->slave)) ready |= POLLIN;
         if ((events & POLLOUT) && state->input_used < PTY_BUFFER && state->line_used < PTY_LINE) ready |= POLLOUT;
     } else {
         if ((events & POLLIN) && (state->input_used || state->eof)) ready |= POLLIN;

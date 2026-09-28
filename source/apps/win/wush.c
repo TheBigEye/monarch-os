@@ -93,6 +93,13 @@ int wush_run(void) {
         message.opcode != WIN_ACK) return 1;
     handle = message.handle;
 
+    /* Keep only the PTY master and Wing socket. All three service children
+       inherited the PTY slave from SPARK; leaving copies on 0/1/2 would keep
+       the slave alive after USH exits and make subsequent `wing` sessions
+       leak processes and heap pages. */
+    close(0);
+    close(1);
+    close(2);
     fcntl(3, F_SETFL, O_NONBLOCK);
     fcntl(wing, F_SETFL, O_NONBLOCK);
     for (;;) {

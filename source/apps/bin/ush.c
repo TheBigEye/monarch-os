@@ -1697,6 +1697,9 @@ int main(int argc, char **argv) {
     char line[LINE_MAX];
     int last = 0;
 
+    /* The graphical PTY master is reserved for WUSH. Keeping an inherited
+       duplicate in USH would prevent the slave from reaching EOF on exit. */
+    close(3);
     envinit();
 
     if (argc >= 3 && strcmp(argv[1], "-c") == 0) {

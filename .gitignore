@@ -1,0 +1,10 @@
+.build/
+limine/
+public/OS.iso
+*.o
+*.elf
+*.iso
+*.map
+*.d
+initrd/share/*.mbi
+initrd/share/gallery/*.mbi

@@ -345,7 +345,9 @@ static int client_send(struct wing_client *client, const WinMessage *message) {
 static void client_close(struct wing_client *client,
                          struct wing_client clients[WING_CLIENT_MAX],
                          WindowManager *manager, struct dirty *dirty) {
+    int terminal_client;
     if (!client) return;
+    terminal_client = (client->flags & WIN_CLIENT_TERMINAL) != 0;
     if (client->fd >= 0) {
         server_cleanup_client(manager, clients, client, dirty);
         close(client->fd);
@@ -356,6 +358,8 @@ static void client_close(struct wing_client *client,
     client->output = nil;
     client->output_used = 0;
     client->output_capacity = 0;
+    client->flags = 0;
+    if (terminal_client) exit(0);
 }
 
 static void wing_send_event(struct wing_client clients[WING_CLIENT_MAX], Window *target,
@@ -680,6 +684,10 @@ int main(int argc, char **argv) {
     uint32_t old_buttons = 0;
     int once = argc > 1 && strcmp(argv[1], "--once") == 0;
 
+    /* SPARK passes the PTY master through inherited descriptors. Wing does not
+       consume it; close the copy so it cannot keep the session alive. */
+    close(3);
+
     /* context_menu is a plain state object, not a constructor-backed widget.
        It must start hidden; otherwise stale stack bytes can make the first
        compositor pass paint an arbitrary rectangle or dereference garbage. */
@@ -774,6 +782,12 @@ int main(int argc, char **argv) {
        is ready. Clients cannot race the initial compositor setup. */
     server_fd = wing_server_open(clients);
     if (server_fd < 0) eputs("wing: socket server unavailable\n");
+    /* SPARK's service children inherit the PTY slave on 0/1/2. Wing never
+       uses those descriptors; closing them is essential so USH exit can
+       produce slave EOF and terminate the whole graphical session. */
+    close(0);
+    close(1);
+    close(2);
 
     if (!once) {
         for (;;) {

@@ -806,7 +806,7 @@ static const char *const bush_commands[] = {
     "beep", "ac97", "mounts", "initrd", "ram0", "fds",
     "proc", "ps", "spawn", "threads", "kthread", "yield", "nap",
     "sched", "preempt", "quantum", "int80", "elf", "runelf", "exec",
-    "wait", "devwrite", "devread", "cd", "reboot", "shutdown", "halt"
+    "wait", "devwrite", "devread", "wing", "cd", "reboot", "shutdown", "halt"
 };
 
 static const char *const debug_commands[] = {
@@ -830,7 +830,7 @@ static int utility(const char *name) {
     static const char *const names[] = {
         "args", "badptr", "bmpcheck", "cat", "cksum", "clock", "dirtest", "edlin", "env", "echo", "ext2info", "fatinfo", "fdtest", "grep", "head", "irdcheck", "ll", "ls", "lsinitrd",
         "mbicheck", "mkdir", "mount", "partinfo", "pid", "pwd", "rm", "rmdir", "sleep", "stat", "touch", "tree", "true", "false", "umount", "uname", "ush", "wc",
-        "write", "append"
+        "write", "append", "wing"
     };
 
     for (unsigned i = 0; i < countof(names); i++) {

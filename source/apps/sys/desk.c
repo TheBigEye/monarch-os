@@ -133,7 +133,7 @@ static int create_button(Desk *self, uint32_t parent, const char *title,
     message.request = request;
     message.handle = *handle;
     message.x = 8;
-    message.y = 3;
+    message.y = 6;
     strncpy(message.text, title, sizeof(message.text));
     if (!self->channel.send(&self->channel, &message) ||
         !wait_ack(self, request, &reply)) return 0;
@@ -299,28 +299,20 @@ static int create_taskbar(Desk *self) {
 
 static int run_desk(Desk *self) {
     WinMessage message;
-    if (!self) return 0;
+    if (!self || !create_taskbar(self)) return 0;
     for (;;) {
-        if (!create_taskbar(self)) {
-            if (self->fd >= 0) close(self->fd);
-            self->fd = -1;
-            if (!self->connect(self)) return 0;
-            continue;
+        struct pollfd ready;
+        ready.fd = self->fd; ready.events = POLLIN; ready.revents = 0;
+        if (poll(&ready, 1, 1000) < 0) break;
+        if (ready.revents & (POLLIN | POLLHUP | POLLERR)) {
+            if (!self->channel.recv(&self->channel, &message)) break;
+            if (message.opcode == WIN_EVENT) self->event(self, &message);
+            drain_events(self);
         }
-        for (;;) {
-            struct pollfd ready;
-            ready.fd = self->fd; ready.events = POLLIN; ready.revents = 0;
-            if (poll(&ready, 1, 1000) < 0) break;
-            if (ready.revents & POLLIN) {
-                if (!self->channel.recv(&self->channel, &message)) break;
-                if (message.opcode == WIN_EVENT) self->event(self, &message);
-                drain_events(self);
-            }
-        }
-        close(self->fd);
-        self->fd = -1;
-        if (!self->connect(self)) return 0;
     }
+    close(self->fd);
+    self->fd = -1;
+    return 0;
 }
 
 int main(int argc, char **argv) {
@@ -328,11 +320,18 @@ int main(int argc, char **argv) {
     unused(argc); unused(argv);
     memset(&desk, 0, sizeof(desk));
     desk.fd = -1;
+    /* Desk is not a PTY endpoint. Do not retain SPARK's inherited master. */
+    close(3);
     desk.request = WIN_REQUEST_FIRST;
     desk.event = event;
     desk.refresh = refresh;
     desk.connect = connect_desk;
     desk.run = run_desk;
     if (!desk.connect(&desk)) return 1;
+    /* Desk is a Wing client, not a PTY consumer. Release inherited slave
+       descriptors so the session can observe USH termination. */
+    close(0);
+    close(1);
+    close(2);
     return desk.run(&desk) ? 0 : 1;
 }
